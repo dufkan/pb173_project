@@ -2,7 +2,7 @@ CXXSTD=14
 CXXFLAGS=-Wall -Wextra
 LINK=-lmbedcrypto
 SOURCES_GEN=src/impl.cpp
-SOURCES_MAIN=$(SOURCES_GEN) src/main.cpp
+SOURCES_MAIN=$(SOURCES_GEN) src/server/main.cpp
 SOURCES_TEST=$(SOURCES_GEN) test/tests.cpp
 
 CXXOPTS=-std=c++$(CXXSTD) $(CXXFLAGS)

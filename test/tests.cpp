@@ -1,4 +1,4 @@
-#include "../src/impl.hpp"
+#include "../src/server/impl.hpp"
 
 #define CATCH_CONFIG_MAIN
 #include "catch.hpp"
