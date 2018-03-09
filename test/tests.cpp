@@ -1,7 +1,9 @@
-#include "../src/server/impl.hpp"
+#include "../server/impl.hpp"
 
+#ifndef CATCH_CONFIG_MAIN
 #define CATCH_CONFIG_MAIN
 #include "catch.hpp"
+#endif
 
 TEST_CASE("File IO", "[file]") {
     SECTION("Read") {
