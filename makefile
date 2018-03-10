@@ -1,6 +1,6 @@
 CXXSTD=14
 CXXFLAGS=-Wall -Wextra
-LINK=libs/mbedtls/build/library/libmbedcrypto.a
+LINK=libs/mbedtls/library/libmbedcrypto.a
 INCLUDE_DIRS=-Ilibs/mbedtls/include/
 SOURCES_GEN=server/impl.cpp
 SOURCES_SERVER=$(SOURCES_GEN) server/main.cpp
