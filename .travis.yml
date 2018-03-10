@@ -1,5 +1,3 @@
 language: cpp
 compiler: clang
-sudo: required
-before_install: ./install_dependencies.sh
 script: make all test

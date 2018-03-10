@@ -1,17 +1,18 @@
 CXXSTD=14
 CXXFLAGS=-Wall -Wextra
-LINK=-lmbedcrypto
+LINK=libs/mbedtls/build/library/libmbedcrypto.a
+INCLUDE_DIRS=-Ilibs/mbedtls/include/
 SOURCES_GEN=server/impl.cpp
 SOURCES_SERVER=$(SOURCES_GEN) server/main.cpp
 SOURCES_CLIENT=$(SOURCES_GEN) client/main.cpp
 SOURCES_TEST=$(SOURCES_GEN) test/tests.cpp
 
-CXXOPTS=-std=c++$(CXXSTD) $(CXXFLAGS)
+CXXOPTS=-std=c++$(CXXSTD) $(CXXFLAGS) $(INCLUDE_DIRS)
 OBJECTS_SERVER=$(SOURCES_SERVER:.cpp=.o)
 OBJECTS_CLIENT=$(SOURCES_CLIENT:.cpp=.o)
 OBJECTS_TEST=$(SOURCES_TEST:.cpp=.o)
 
-all: server-main client-main tests
+all: mbedtls server-main client-main tests
 
 test: tests
 	rm -f noread nowrite noexist
@@ -34,3 +35,6 @@ tests: $(OBJECTS_TEST)
 
 clean:
 	rm -rf $(OBJECTS_SERVER) $(OBJECTS_CLIENT) $(OBJECTS_TEST)
+
+mbedtls:
+	cd libs/mbedtls && make lib
