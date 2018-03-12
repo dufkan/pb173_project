@@ -1,3 +1,0 @@
-\beamer@endinputifotherversion {3.36pt}
-\select@language {czech}
-\beamer@sectionintoc {1}{\IeC {\'U}vod}{2}{0}{1}
