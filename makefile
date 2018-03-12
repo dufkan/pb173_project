@@ -1,7 +1,7 @@
 CXXSTD=14
-CXXFLAGS=-Wall -Wextra
-LINK=libs/mbedtls/library/libmbedcrypto.a
-INCLUDE_DIRS=-Ilibs/mbedtls/include/
+CXXFLAGS=-Wall -Wextra -DASIO_STANDALONE
+LINK=libs/mbedtls/library/libmbedcrypto.a -lpthread
+INCLUDE_DIRS=-Ilibs/mbedtls/include/ -Ilibs/asio/include/
 SOURCES_GEN=server/impl.cpp
 SOURCES_SERVER=$(SOURCES_GEN) server/main.cpp
 SOURCES_CLIENT=$(SOURCES_GEN) client/main.cpp
@@ -37,4 +37,4 @@ clean:
 	rm -rf $(OBJECTS_SERVER) $(OBJECTS_CLIENT) $(OBJECTS_TEST)
 
 mbedtls:
-	cd libs/mbedtls && make lib
+	cd libs/mbedtls && $(MAKE) lib
