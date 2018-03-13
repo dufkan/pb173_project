@@ -22,7 +22,7 @@ void initiate_connection(/* asio::tcp server*/);
  * 
  * @param pseudonym - pseudonym of the reciever
  */
-msg::Message write_message(std::string pseudonym)
+msg::Message write_message(std::string pseudonym);
 
 /**
  * Receives a message from connection.
@@ -107,7 +107,7 @@ std::vector<uint_8> chr_create_key(std::vector<uint_8> chall, std::vector<uint_8
  *
  * @param conn - connection which should be closed
  */
-void close_connection(/*asio::tcp::connection& conn*/)
+void close_connection(/*asio::tcp::connection& conn*/);
 
 
 /**
