@@ -28,6 +28,8 @@ void accept_connection(/* asio::tcp::acceptor& acceptor */);
  * Receives a message from connection.
  *
  * @param conn Connection to recieve message from
+ *
+ * @return Vector of bytes of received message
  */
 std::vector<uint8_t> recv_message(/* asio::tcp::connection& conn */);
 
@@ -50,6 +52,8 @@ void add_user(std::string pseudonym, std::vector<uint8_t> pubkey);
  * Get user information from database.
  *
  * @param pseudonym Pseudonym of the user
+ *
+ * @return Information about the user (public key)
  */
 std::vector<uint8_t> get_user(std::string pseudonym);
 
@@ -57,6 +61,8 @@ std::vector<uint8_t> get_user(std::string pseudonym);
  * Create challenge message for challenge-response protocol.
  *
  * @param pubkey Public key to use for challenge encryption
+ *
+ * @return Challenge message
  */
 msg::Challenge create_challenge(std::vector<uint8_t> pubkey);
 
@@ -65,6 +71,8 @@ msg::Challenge create_challenge(std::vector<uint8_t> pubkey);
  *
  * @param challenge Received challenge
  * @param pubkey Public key of the response recipient
+ *
+ * @return Response message
  */
 msg::Response create_response(std::vector<uint8_t> challenge, std::vector<uint8_t> pubkey);
 
