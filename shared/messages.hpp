@@ -9,6 +9,19 @@
 
 namespace msg {
 
+
+enum class MessageType : uint8_t {
+    Register,
+    Login,
+    Logout,
+    Challenge,
+    Response,
+    Send,
+    Receive,
+    ReqKey,
+    RetKey,
+};
+
 /**
  * Message interface
  *
@@ -23,8 +36,8 @@ public:
      *
      * @param msg Binary representation of message
      */
-    static uint8_t type(const std::vector<uint8_t>& msg) {
-        return msg[0];
+    static MessageType type(const std::vector<uint8_t>& msg) {
+        return static_cast<MessageType>(msg[0]);
     }
 
     /**
@@ -77,8 +90,8 @@ public:
 
     std::vector<uint8_t> serialize() const override {
         std::vector<uint8_t> message;
-        message.reserve(name.length() + 1 + 1);
-        message.push_back(0x01);
+        message.reserve(name.length() + sizeof(MessageType) + 1);
+        message.push_back(static_cast<uint8_t>(MessageType::Register));
         message.push_back(name.size());
         std::copy(name.begin(), name.end(), std::back_inserter(message));
         return message;
@@ -106,16 +119,14 @@ class RetKey : public Message {};
 
 /**
  * Deserializer for recreating messages transfered through network
- *
- * Much WIP, just look, do not touch!
  */
 class MessageDeserializer {
-    std::unordered_map<uint8_t, std::function<std::unique_ptr<Message>(const std::vector<uint8_t>&)>> deserialize_map;
+    std::unordered_map<MessageType, std::function<std::unique_ptr<Message>(const std::vector<uint8_t>&)>> deserialize_map;
 
 public:
     MessageDeserializer() {
         // create mapping between message types and deserialize function pointer
-        deserialize_map.insert({0x01, &Register::deserialize});
+        deserialize_map.insert({MessageType::Register, &Register::deserialize});
     }
 
     /**
