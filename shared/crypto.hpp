@@ -63,12 +63,50 @@ std::vector<uint8_t> decrypt_rsa(const std::vector<uint8_t>& data, const std::ve
 
 /**
  * Hash data by SHA2-256
- *
+ *comm
  * @param data Input data
  *
  * @return Hashed input data
  */
 std::array<uint8_t, 32> hash_sha(const std::vector<uint8_t>& data);
+
+/**
+ * Generate data hash and compare it with control_hash
+ * 
+ * @param data - input data
+ * @param control_hash
+ */
+bool check_hash(std::vector<uint8_t> data, std::vector <uint8_t> control_hash);
+
+/** 
+ * Generate random data of the length len
+ *
+ * @param len - length of the data
+ */
+std::vector<uint8_t> get_random_data(size_t len);
+
+/**
+ * Create new pair od keys for RSA
+ *
+* @param prikey - the new private key will be saved here
+ * @param pubkey - the new public key will be saved here
+ */
+void generate_keys(std::vector<uint_8> prikey, std::vector<uint_8> pubkey);
+
+
+/**
+ * Create key by hashing data from fisrt_part and second_part
+ *
+ * @param first_part - data from challenge
+ * @param second_part - data from response
+ * @return symetric key created from chall and resp
+ */ 
+std::vector<uint_8> create_symmetric_key(std::vector<uint_8> first_part, std::vector<uint_8> rsecond_part);
+
+
+
+
+
 
 } // namespace cry
 
