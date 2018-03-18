@@ -3,9 +3,12 @@
 
 #include <vector>
 #include <string>
+#include <iostream>
+#include <iterator>
+#include <fstream>
 
-#include "asio.hpp"
-#include "../shared/message.hpp"
+//#include "asio.hpp"
+#include "../shared/messages.hpp"
 #include "../shared/crypto.hpp"
 
 
@@ -15,14 +18,14 @@
  * @param ip IP address of the server
  * @param port TCP port of the server
  */
-void server(/* ip */, /* port */);
+//void server(/* ip */, /* port */);
 
 /**
  * Accepts a connection from acceptor
  *
  * @param acceptor Acceptor object listening to connections.
  */
-void accept_connection(/* asio::tcp::acceptor& acceptor */);
+//void accept_connection(/* asio::tcp::acceptor& acceptor */);
 
 /**
  * Receives a message from connection.
@@ -31,22 +34,39 @@ void accept_connection(/* asio::tcp::acceptor& acceptor */);
  *
  * @return Vector of bytes of received message
  */
-std::vector<uint8_t> recv_message(/* asio::tcp::connection& conn */);
+//std::vector<uint8_t> recv_message(/* asio::tcp::connection& conn */);
 
 /**
  * Sends a message to connection.
  *
  * @param conn Connection to send to
  */
-void send_message(/* asio::tcp::connection& conn */, msg::Message& message);
+//void send_message(/* asio::tcp::connection& conn */, msg::Message& message);
+
+/**
+ * Read contents of file.
+ *
+ * @param fname Name of file to read from
+ * @return File contents
+ */
+std::vector<uint8_t> read_file(const std::string& fname);
+
+/**
+ * Write vector of bytes into file.
+ *
+ * @param fname Name of file to write to
+ * @param data Bytes to write
+ */
+void write_file(const std::string& fname, const std::vector<uint8_t>& data, bool append = false);
 
 /**
  * Add new user to database.
  *
  * @param pseudonym Pseudonym of the user
  * @param pubkey Public key of the user
+ * @return False if user already exists; true otherwise
  */
-void add_user(std::string pseudonym, std::vector<uint8_t> pubkey);
+bool add_user(std::string pseudonym, std::vector<uint8_t> pubkey);
 
 /**
  * Get user information from database.
@@ -56,25 +76,5 @@ void add_user(std::string pseudonym, std::vector<uint8_t> pubkey);
  * @return Information about the user (public key)
  */
 std::vector<uint8_t> get_user(std::string pseudonym);
-
-/**
- * Create challenge message for challenge-response protocol.
- *
- * @param pubkey Public key to use for challenge encryption
- *
- * @return Challenge message
- */
-msg::Challenge create_challenge(std::vector<uint8_t> pubkey);
-
-/**
- * Create response message for challenge-response protocol.
- *
- * @param challenge Received challenge
- * @param pubkey Public key of the response recipient
- *
- * @return Response message
- */
-msg::Response create_response(std::vector<uint8_t> challenge, std::vector<uint8_t> pubkey);
-
 
 #endif

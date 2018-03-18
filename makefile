@@ -2,7 +2,7 @@ CXXSTD=14
 CXXFLAGS=-Wall -Wextra -DASIO_STANDALONE
 LINK=libs/mbedtls/library/libmbedcrypto.a -lpthread
 INCLUDE_DIRS=-Ilibs/mbedtls/include/ -Ilibs/asio/include/
-SOURCES_GEN=server/impl.cpp
+SOURCES_GEN=server/server.cpp
 SOURCES_SERVER=$(SOURCES_GEN) server/main.cpp
 SOURCES_CLIENT=$(SOURCES_GEN) client/main.cpp
 SOURCES_TEST=$(SOURCES_GEN) test/tests.cpp
@@ -15,7 +15,7 @@ OBJECTS_TEST=$(SOURCES_TEST:.cpp=.o)
 all: mbedtls server-main client-main tests
 
 test: tests
-	rm -f noread nowrite noexist
+	rm -f noread nowrite noexist u*
 	touch noread nowrite
 	chmod -r noread
 	chmod -w nowrite
