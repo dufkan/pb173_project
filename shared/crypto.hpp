@@ -4,6 +4,14 @@
 #include <vector>
 #include <array>
 #include <stdint.h> 
+#include <cstring>
+#include "mbedtls/aes.h"
+#include "mbedtls/sha256.h"
+#include "mbedtls/config.h"
+#include "mbedtls/rsa.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/ctr_drbg.h"
+
 
 namespace cry {
 
@@ -53,7 +61,7 @@ std::vector<uint8_t> decrypt_aes(const std::vector<uint8_t>& data, std::array<ui
  *
  * @return Vector of encrypted data
  */
-std::vector<uint8_t> encrypt_rsa(const std::vector<uint8_t>& data, const mbedtls_rsa_context& rsa_pub)
+std::vector<uint8_t> encrypt_rsa(const std::vector<uint8_t>& data,  mbedtls_rsa_context* rsa_pub);
 
 /**
  * Decrypt data vector with given private RSA-2048 key
@@ -63,7 +71,7 @@ std::vector<uint8_t> encrypt_rsa(const std::vector<uint8_t>& data, const mbedtls
  *
  * @return Vector of encrypted data
  */
-std::vector<uint8_t> decrypt_rsa(const std::vector<uint8_t>& data, const std::vector<uint8_t>& privkey);
+std::vector<uint8_t> decrypt_rsa(const std::vector<uint8_t>& data, mbedtls_rsa_context* rsa_priv);
 
 /**
  * Hash data by SHA2-256
@@ -80,7 +88,7 @@ std::array<uint8_t, 32> hash_sha(const std::vector<uint8_t>& data);
  * @param data - input data
  * @param control_hash
  */
-bool check_hash(std::vector<uint8_t> data, std::vector <uint8_t> control_hash);
+bool check_hash(std::vector<uint8_t> data, std::array <uint8_t,32> control_hash);
 
 /** 
  * Generate random data of the length len

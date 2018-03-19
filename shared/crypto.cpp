@@ -2,10 +2,10 @@
 //#include "../libs/mbedtls/include/mbedtls/aes.h"
 //#include "../libs/mbedtls/include/mbedtls/sha512.h"
 //#include "../libs/mbedtls/include/mbedtls/config.h"
-#include "mbedtls/aes.h"
-#include "mbedtls/sha512.h"
-#include "mbedtls/config.h"
-#include "rsa.h"
+//#include "mbedtls/aes.h"
+//#include "mbedtls/sha512.h"
+//#include "mbedtls/config.h"
+//#include "rsa.h"
 #include <vector>
 
 void cry::pad(std::vector<uint8_t>& data, uint8_t bsize){
@@ -51,7 +51,7 @@ std::vector<uint8_t> cry::decrypt_aes(const std::vector<uint8_t>& data, std::arr
 }
 
 
-std::vector<uint8_t> cry::encrypt_rsa(const std::vector<uint8_t>& data, const mbedtls_rsa_context& rsa_pub) {
+std::vector<uint8_t> cry::encrypt_rsa(const std::vector<uint8_t>& data, mbedtls_rsa_context* rsa_pub) {
     std::vector<uint8_t> result;
     result.resize(data.size());
     mbedtls_rsa_public( rsa_pub, data.data(), result.data());
@@ -59,7 +59,7 @@ std::vector<uint8_t> cry::encrypt_rsa(const std::vector<uint8_t>& data, const mb
 }
 
 
-std::vector<uint8_t> cry::decrypt_rsa(const std::vector<uint8_t>& data, const mbedtls_rsa_context& rsa_priv) {
+std::vector<uint8_t> cry::decrypt_rsa(const std::vector<uint8_t>& data,  mbedtls_rsa_context* rsa_priv) {
     std::vector<uint8_t> result;
     result.resize(data.size());
     
@@ -75,6 +75,7 @@ std::vector<uint8_t> cry::decrypt_rsa(const std::vector<uint8_t>& data, const mb
     
     mbedtls_ctr_drbg_free( &ctr_drbg );
     mbedtls_entropy_free( &entropy );
+    return result;
 }
 
 
@@ -88,7 +89,7 @@ std::array<uint8_t, 32> cry::hash_sha(const std::vector<uint8_t>& data) {
 bool cry::check_hash(std::vector<uint8_t> data, std::array<uint8_t, 32> control_hash) {
     std::array<uint8_t, 32> act_hash;
     mbedtls_sha256_ret(data.data(), data.size(), act_hash.data(), 0);
-    return atc_hash==control_hash;
+    return (act_hash==control_hash);
 }
 
 
@@ -100,7 +101,6 @@ std::vector<uint8_t> get_random_data(size_t len) {
     result.resize(len);
 
     const char *pers = "some random string";
-    int ret;
 
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_init(&ctr_drbg);
