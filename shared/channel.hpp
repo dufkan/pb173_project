@@ -4,7 +4,7 @@
 #include "asio.hpp"
 
 class Channel {
-    asio::io_service io_service;
+//  asio::io_service io_service;
 
 public:
 /*    Channel() {
