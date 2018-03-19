@@ -6,11 +6,33 @@
 #include <iostream>
 #include <iterator>
 #include <fstream>
+#include <unordered_map>
 
 //#include "asio.hpp"
 #include "../shared/messages.hpp"
 #include "../shared/crypto.hpp"
+#include "../shared/channel.hpp"
 
+class Server {
+public:
+    std::unordered_map<std::string, Channel> connections;
+
+    std::vector<std::string> get_connected_users() {
+        std::vector<std::string> connected;
+        connected.reserve(connections.size());
+        for(auto& c : connections) {
+            connected.push_back(c.first);
+        }
+        return connected;
+    }
+
+    /**
+     * Handling of an incomming connection ~ Authentication,
+     * key agreement, creation of channel.
+     */
+    void handle_new_connection() {
+    }
+};
 
 /**
  * Starts server ~ listening on TCP ip:port.
