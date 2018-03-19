@@ -75,7 +75,7 @@ public:
      */
     static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
         Decoder message{data};
-        uint8_t msgtype = message.get_u8();
+        message.get_u8();
         uint8_t namelen = message.get_u8();
         std::string name = message.get_str(namelen);
         uint16_t keylen = message.get_u16();

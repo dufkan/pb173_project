@@ -2,10 +2,9 @@ CXXSTD=14
 CXXFLAGS=-Wall -Wextra -DASIO_STANDALONE
 LINK=libs/mbedtls/library/libmbedcrypto.a -lpthread
 INCLUDE_DIRS=-Ilibs/mbedtls/include/ -Ilibs/asio/include/
-SOURCES_GEN=server/server.cpp client/client.cpp
-SOURCES_SERVER=$(SOURCES_GEN) server/main.cpp
-SOURCES_CLIENT=$(SOURCES_GEN) client/main.cpp
-SOURCES_TEST=$(SOURCES_GEN) test/tests.cpp
+SOURCES_SERVER=server/server.cpp
+SOURCES_CLIENT=client/client.cpp
+SOURCES_TEST=$(SOURCES_SERVER) $(SOURCES_CLIENT) test/tests.cpp
 
 CXXOPTS=-std=c++$(CXXSTD) $(CXXFLAGS) $(INCLUDE_DIRS)
 OBJECTS_SERVER=$(SOURCES_SERVER:.cpp=.o)
@@ -22,10 +21,10 @@ test: tests
 	./tests
 
 client-main: $(OBJECTS_CLIENT)
-	$(CXX) $(CXXOPTS) -o $@ $^ $(LINK)
+	$(CXX) $(CXXOPTS) -o $@ $^ client/main.cpp $(LINK)
 
 server-main: $(OBJECTS_SERVER)
-	$(CXX) $(CXXOPTS) -o $@ $^ $(LINK)
+	$(CXX) $(CXXOPTS) -o $@ $^ server/main.cpp $(LINK)
 
 tests: $(OBJECTS_TEST)
 	$(CXX) $(CXXOPTS) -o $@ $^ $(LINK)
