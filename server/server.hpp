@@ -6,8 +6,9 @@
 #include <iostream>
 #include <iterator>
 #include <fstream>
-#include <unordered_map>
+#include <map>
 #include <cstdio>
+#include <utility>
 
 //#include "asio.hpp"
 #include "../shared/messages.hpp"
@@ -16,7 +17,7 @@
 
 class Server {
 public:
-    std::unordered_map<std::string, Channel> connections;
+    std::map<std::string, Channel> connections;
 
     std::vector<std::string> get_connected_users() {
         std::vector<std::string> connected;

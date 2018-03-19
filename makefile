@@ -11,10 +11,12 @@ OBJECTS_SERVER=$(SOURCES_SERVER:.cpp=.o)
 OBJECTS_CLIENT=$(SOURCES_CLIENT:.cpp=.o)
 OBJECTS_TEST=$(SOURCES_TEST:.cpp=.o)
 
+TEST_JUNK=noread nowrite noexist u*
+
 all: mbedtls server-main client-main tests
 
 test: tests
-	rm -f noread nowrite noexist u*
+	rm -f $(TEST_JUNK)
 	touch noread nowrite
 	chmod -r noread
 	chmod -w nowrite
@@ -33,7 +35,7 @@ tests: $(OBJECTS_TEST)
 	$(CXX) -c $(CXXOPTS) -o $@ $<
 
 clean:
-	rm -rf $(OBJECTS_SERVER) $(OBJECTS_CLIENT) $(OBJECTS_TEST)
+	rm -rf $(OBJECTS_SERVER) $(OBJECTS_CLIENT) $(OBJECTS_TEST) $(TEST_JUNK)
 
 mbedtls:
 	cd libs/mbedtls && $(MAKE) lib
