@@ -7,6 +7,7 @@
 #include <iterator>
 #include <fstream>
 #include <unordered_map>
+#include <cstdio>
 
 //#include "asio.hpp"
 #include "../shared/messages.hpp"
@@ -89,6 +90,14 @@ void write_file(const std::string& fname, const std::vector<uint8_t>& data, bool
  * @return False if user already exists; true otherwise
  */
 bool add_user(std::string pseudonym, std::vector<uint8_t> pubkey);
+
+/**
+ * Remove user from the database.
+ *
+ * @param pseudonym Pseudonym of the user
+ * @return True if operation succeded; false otherwise
+ */
+bool remove_user(std::string pseudonym);
 
 /**
  * Get user information from database.

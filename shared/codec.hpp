@@ -1,6 +1,7 @@
 #ifndef CODEC_HPP
 #define CODEC_HPP
 #include <vector>
+#include <cstdint>
 #include <stdexcept>
 
 class Encoder {

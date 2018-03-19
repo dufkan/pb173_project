@@ -30,6 +30,10 @@ std::vector<uint8_t> get_user(std::string pseudonym) {
     return read_file(pseudonym);
 }
 
+bool remove_user(std::string pseudonym) {
+    return !std::remove(pseudonym.c_str());
+}
+
 #if 0
 std::pair<std::string, Channel> handle_connection(/* connection */) {
     auto msg = recv();
