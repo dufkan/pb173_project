@@ -6,6 +6,6 @@ void print_help(const std::string& program) {
 }
 
 int main(int argc, char** argv) {
-    print_help();
+    print_help(argv[0]);
     return 0;
 }
