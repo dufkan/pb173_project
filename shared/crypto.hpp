@@ -1,6 +1,10 @@
 #ifndef CRYPTO_HPP
 #define CRYPTO_HPP
 
+#include <vector>
+#include <array>
+#include <stdint.h> 
+
 namespace cry {
 
 /**
@@ -42,17 +46,17 @@ std::vector<uint8_t> encrypt_aes(const std::vector<uint8_t>& data, std::array<ui
 std::vector<uint8_t> decrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 32> iv, const std::array<uint8_t, 32>& key);
 
 /**
- * Encrypt data vector with given public RSA key
+ * Encrypt data vector with given public RSA-2048 key
  *
  * @param data Input data vector
- * @param pubkey Public key to use for encryption
+ * @param rsa_pub rsa context with public key to use for encryption
  *
  * @return Vector of encrypted data
  */
-std::vector<uint8_t> encrypt_rsa(const std::vector<uint8_t>& data, const std::vector<uint8_t>& pubkey);
+std::vector<uint8_t> encrypt_rsa(const std::vector<uint8_t>& data, const mbedtls_rsa_context& rsa_pub)
 
 /**
- * Decrypt data vector with given private RSA key
+ * Decrypt data vector with given private RSA-2048 key
  *
  * @param data Input data vector
  * @param pubkey Private key to use for decryption
@@ -63,7 +67,7 @@ std::vector<uint8_t> decrypt_rsa(const std::vector<uint8_t>& data, const std::ve
 
 /**
  * Hash data by SHA2-256
- *comm
+ *
  * @param data Input data
  *
  * @return Hashed input data
@@ -91,7 +95,7 @@ std::vector<uint8_t> get_random_data(size_t len);
 * @param prikey - the new private key will be saved here
  * @param pubkey - the new public key will be saved here
  */
-void generate_keys(std::vector<uint_8> prikey, std::vector<uint_8> pubkey);
+void generate_keys(std::vector<uint8_t> prikey, std::vector<uint8_t> pubkey);
 
 
 /**
@@ -101,7 +105,7 @@ void generate_keys(std::vector<uint_8> prikey, std::vector<uint_8> pubkey);
  * @param second_part - data from response
  * @return symetric key created from chall and resp
  */ 
-std::vector<uint_8> create_symmetric_key(std::vector<uint_8> first_part, std::vector<uint_8> rsecond_part);
+std::vector<uint8_t> create_symmetric_key(std::vector<uint8_t> first_part, std::vector<uint8_t> second_part);
 
 
 
