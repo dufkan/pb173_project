@@ -23,7 +23,7 @@ void cry::unpad(std::vector<uint8_t>& data, uint8_t bsize) {
 }
 
 
-std::vector<uint8_t> cry::encrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 32> iv, const std::array<uint8_t, 32>& key) {
+std::vector<uint8_t> cry::encrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key) {
     std::vector<uint8_t> result;
     result.resize(data.size());
 
@@ -37,7 +37,7 @@ std::vector<uint8_t> cry::encrypt_aes(const std::vector<uint8_t>& data, std::arr
 }
 
 
-std::vector<uint8_t> cry::decrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 32> iv, const std::array<uint8_t, 32>& key) {
+std::vector<uint8_t> cry::decrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key) {
     std::vector<uint8_t> result;
     result.resize(data.size());
 
@@ -112,3 +112,7 @@ std::vector<uint8_t> get_random_data(size_t len) {
 }
 
 
+std::array<uint8_t,32> create_symmetric_key(std::vector<uint8_t> first_part, std::vector<uint8_t> second_part) {
+    first_part.insert(first_part.end(),second_part.begin(),second_part.end());
+    return cry::hash_sha(first_part);
+}

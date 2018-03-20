@@ -40,7 +40,7 @@ void unpad(std::vector<uint8_t>& data, uint8_t bsize);
  *
  * @return Vector of encrypted data
  */
-std::vector<uint8_t> encrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 32> iv, const std::array<uint8_t, 32>& key);
+std::vector<uint8_t> encrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key);
 
 /**
  * Decrypt data vector with given key and IV by AES-256 in CBC mode
@@ -51,7 +51,7 @@ std::vector<uint8_t> encrypt_aes(const std::vector<uint8_t>& data, std::array<ui
  *
  * @return Vector of decrypted data
  */
-std::vector<uint8_t> decrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 32> iv, const std::array<uint8_t, 32>& key);
+std::vector<uint8_t> decrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key);
 
 /**
  * Encrypt data vector with given public RSA-2048 key
@@ -113,7 +113,7 @@ void generate_keys(std::vector<uint8_t> prikey, std::vector<uint8_t> pubkey);
  * @param second_part - data from response
  * @return symetric key created from chall and resp
  */ 
-std::vector<uint8_t> create_symmetric_key(std::vector<uint8_t> first_part, std::vector<uint8_t> second_part);
+std::array<uint8_t,32> create_symmetric_key(std::vector<uint8_t> first_part, std::vector<uint8_t> second_part);
 
 
 
