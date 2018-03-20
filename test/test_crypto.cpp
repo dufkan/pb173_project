@@ -76,9 +76,17 @@ TEST_CASE("SHA2-256 test vectors") {
     a1M.resize(1000000, 0x61);
     std::array<uint8_t,32> hash_a1M = {{0xcd, 0xc7, 0x6e, 0x5c, 0x99, 0x14, 0xfb, 0x92, 0x81, 0xa1, 0xc7, 0xe2, 0x84, 0xd7, 0x3e, 0x67, 0xf1, 0x80, 0x9a, 0x48, 0xa4, 0x97, 0x20, 0x0e, 0x04, 0x6d, 0x39, 0xcc, 0xc7, 0x11, 0x2c, 0xd0}};
 
-    REQUIRE(cry::hash_sha(abc) == hash_abc);
-    REQUIRE(cry::hash_sha(empty) == hash_empty);
-    REQUIRE(cry::hash_sha(a1M) == hash_a1M);
+    SECTION("Create hash") {
+        CHECK(cry::hash_sha(abc) == hash_abc);
+        CHECK(cry::hash_sha(empty) == hash_empty);
+        CHECK(cry::hash_sha(a1M) == hash_a1M);
+    }
+
+    SECTION("Check hash"){
+	CHECK(cry::check_hash(abc,hash_abc));
+	CHECK(cry::check_hash(empty,hash_empty));
+	CHECK(cry::check_hash(a1M,hash_a1M));
+    }
 }
 
 
