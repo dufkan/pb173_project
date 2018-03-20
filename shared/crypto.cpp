@@ -1,11 +1,4 @@
 #include "crypto.hpp"
-//#include "../libs/mbedtls/include/mbedtls/aes.h"
-//#include "../libs/mbedtls/include/mbedtls/sha512.h"
-//#include "../libs/mbedtls/include/mbedtls/config.h"
-//#include "mbedtls/aes.h"
-//#include "mbedtls/sha512.h"
-//#include "mbedtls/config.h"
-//#include "rsa.h"
 #include <vector>
 
 void cry::pad(std::vector<uint8_t>& data, uint8_t bsize){
@@ -62,17 +55,17 @@ std::vector<uint8_t> cry::encrypt_rsa(const std::vector<uint8_t>& data, mbedtls_
 std::vector<uint8_t> cry::decrypt_rsa(const std::vector<uint8_t>& data,  mbedtls_rsa_context* rsa_priv) {
     std::vector<uint8_t> result;
     result.resize(data.size());
-    
+
     const char *pers = "rsa_decrypt";
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_ctr_drbg_init(&ctr_drbg);
     mbedtls_entropy_init(&entropy);
-    
+
     mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers,strlen(pers));
 
     mbedtls_rsa_private( rsa_priv, mbedtls_ctr_drbg_random, &ctr_drbg, data.data(), result.data());
-    
+
     mbedtls_ctr_drbg_free( &ctr_drbg );
     mbedtls_entropy_free( &entropy );
     return result;

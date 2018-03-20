@@ -12,7 +12,6 @@
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
 
-
 namespace cry {
 
 /**
@@ -61,7 +60,11 @@ std::vector<uint8_t> decrypt_aes(const std::vector<uint8_t>& data, std::array<ui
  *
  * @return Vector of encrypted data
  */
+<<<<<<< Updated upstream
 std::vector<uint8_t> encrypt_rsa(const std::vector<uint8_t>& data,  mbedtls_rsa_context* rsa_pub);
+=======
+std::vector<uint8_t> encrypt_rsa(const std::vector<uint8_t>& data, const mbedtls_rsa_context& rsa_pub);
+>>>>>>> Stashed changes
 
 /**
  * Decrypt data vector with given private RSA-2048 key
