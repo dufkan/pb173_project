@@ -12,7 +12,6 @@
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
 
-
 namespace cry {
 
 /**
