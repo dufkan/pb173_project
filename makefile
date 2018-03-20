@@ -5,12 +5,13 @@ INCLUDE_DIRS=-Ilibs/mbedtls/include/ -Ilibs/asio/include/
 SOURCES_SERVER=server/server.cpp
 SOURCES_CLIENT=client/client.cpp
 SOURCES_OTHER=shared/crypto.cpp
-SOURCES_TEST=$(SOURCES_SERVER) $(SOURCES_CLIENT) $(SOURCES_OTHER) test/tests.cpp test/test_crypto.cpp
+SOURCES_TEST=test/test_server.cpp test/test_crypto.cpp
+SOURCES_TEST_ALL=$(SOURCES_SERVER) $(SOURCES_CLIENT) $(SOURCES_OTHER) $(SOURCES_TEST)
 
 CXXOPTS=-std=c++$(CXXSTD) $(CXXFLAGS) $(INCLUDE_DIRS)
 OBJECTS_SERVER=$(SOURCES_SERVER:.cpp=.o)
 OBJECTS_CLIENT=$(SOURCES_CLIENT:.cpp=.o)
-OBJECTS_TEST=$(SOURCES_TEST:.cpp=.o)
+OBJECTS_TEST_ALL=$(SOURCES_TEST_ALL:.cpp=.o)
 
 TEST_JUNK=noread nowrite noexist u*
 
@@ -29,14 +30,14 @@ client-main: $(OBJECTS_CLIENT)
 server-main: $(OBJECTS_SERVER)
 	$(CXX) $(CXXOPTS) -o $@ $^ server/main.cpp $(LINK)
 
-tests: $(OBJECTS_TEST)
+tests: $(OBJECTS_TEST_ALL)
 	$(CXX) $(CXXOPTS) -o $@ $^ $(LINK)
 
 %.o: %.cpp
 	$(CXX) -c $(CXXOPTS) -o $@ $<
 
 clean:
-	rm -rf $(OBJECTS_SERVER) $(OBJECTS_CLIENT) $(OBJECTS_TEST) $(TEST_JUNK)
+	rm -rf $(OBJECTS_SERVER) $(OBJECTS_CLIENT) $(OBJECTS_TEST_ALL) $(TEST_JUNK)
 
 mbedtls:
 	cd libs/mbedtls && $(MAKE) lib

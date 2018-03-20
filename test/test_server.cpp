@@ -1,5 +1,4 @@
 #include "../server/server.hpp"
-#include "../shared/crypto.hpp"
 
 #ifndef CATCH_CONFIG_MAIN
 #define CATCH_CONFIG_MAIN
