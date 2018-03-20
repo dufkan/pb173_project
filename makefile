@@ -5,7 +5,7 @@ INCLUDE_DIRS=-Ilibs/mbedtls/include/ -Ilibs/asio/include/
 SOURCES_SERVER=server/server.cpp
 SOURCES_CLIENT=client/client.cpp
 SOURCES_OTHER=shared/crypto.cpp
-SOURCES_TEST=$(SOURCES_SERVER) $(SOURCES_CLIENT) $(SOURCES_OTHER) test/tests.cpp
+SOURCES_TEST=$(SOURCES_SERVER) $(SOURCES_CLIENT) $(SOURCES_OTHER) test/tests.cpp test/test_crypto.cpp
 
 CXXOPTS=-std=c++$(CXXSTD) $(CXXFLAGS) $(INCLUDE_DIRS)
 OBJECTS_SERVER=$(SOURCES_SERVER:.cpp=.o)
