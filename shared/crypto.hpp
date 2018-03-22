@@ -6,11 +6,14 @@
 #include <stdint.h> 
 #include <cstring>
 #include "mbedtls/aes.h"
-#include "mbedtls/sha256.h"
+#include "mbedtls/bignum.h"
 #include "mbedtls/config.h"
-#include "mbedtls/rsa.h"
-#include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/rsa.h"
+#include "mbedtls/sha256.h"
+#include "mbedtls/x509.h"
+
 
 namespace cry {
 
@@ -102,8 +105,7 @@ std::vector<uint8_t> get_random_data(size_t len);
 * @param prikey - the new private key will be saved here
  * @param pubkey - the new public key will be saved here
  */
-void generate_keys(std::vector<uint8_t> prikey, std::vector<uint8_t> pubkey);
-
+void generate_keys(mbedtls_rsa_context* rsa_pub, mbedtls_rsa_context* rsa_priv);
 
 /**
  * Create key by hashing data from fisrt_part and second_part

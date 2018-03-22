@@ -1,5 +1,5 @@
 #include "crypto.hpp"
-#include <vector>
+
 
 void cry::pad(std::vector<uint8_t>& data, uint8_t bsize){
     int8_t val = bsize - (data.size() % bsize);
@@ -87,7 +87,7 @@ bool cry::check_hash(std::vector<uint8_t> data, std::array<uint8_t, 32> control_
 
 
 
-std::vector<uint8_t> get_random_data(size_t len) {
+std::vector<uint8_t> cry::get_random_data(size_t len) {
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_entropy_context entropy;
     std::vector<uint8_t> result;
@@ -105,7 +105,45 @@ std::vector<uint8_t> get_random_data(size_t len) {
 }
 
 
+void cry::generate_keys(mbedtls_rsa_context* rsa_pub, mbedtls_rsa_context* rsa_priv){
+    int exponent = 65537;
+    unsigned int key_size = 2048;
+    mbedtls_rsa_context rsa;
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_mpi N, P, Q, D, E;/*, DP, DQ, QP;*/
+    const char *pers = "rsa_genkey";
+
+    //mbedtls_rsa_free(rsa_pub);mbedtls_rsa_free(rsa_priv);
+    //mbedtls_rsa_init(rsa_pub, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
+    //mbedtls_rsa_init(rsa_priv, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
+    
+    mbedtls_ctr_drbg_init( &ctr_drbg );
+    mbedtls_rsa_init( &rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
+    mbedtls_mpi_init( &N ); mbedtls_mpi_init( &P ); mbedtls_mpi_init( &Q );
+    mbedtls_mpi_init( &D ); mbedtls_mpi_init( &E );/* mbedtls_mpi_init( &DP );
+    mbedtls_mpi_init( &DQ ); mbedtls_mpi_init( &QP );*/
+    mbedtls_entropy_init( &entropy );
+    mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy,(const unsigned char *) pers, strlen(pers));
+
+    mbedtls_rsa_gen_key( &rsa, mbedtls_ctr_drbg_random, &ctr_drbg, key_size, exponent);
+    mbedtls_rsa_export( &rsa, &N, &P, &Q, &D, &E );
+    /*mbedtls_rsa_export_crt( &rsa, &DP, &DQ, &QP)*/
+    
+    mbedtls_rsa_import(rsa_pub, &N, NULL, NULL, NULL, &E);
+    mbedtls_rsa_import(rsa_priv, &N, &P, &Q, &D, &E);
+    
+    mbedtls_mpi_free( &N ); mbedtls_mpi_free( &P ); mbedtls_mpi_free( &Q );
+    mbedtls_mpi_free( &D ); mbedtls_mpi_free( &E ); /*mbedtls_mpi_free( &DP );
+    mbedtls_mpi_free( &DQ ); mbedtls_mpi_free( &QP );*/
+    mbedtls_rsa_free( &rsa );
+    mbedtls_ctr_drbg_free( &ctr_drbg );
+    mbedtls_entropy_free( &entropy );
+}	
+
+
+/*
 std::array<uint8_t,32> create_symmetric_key(std::vector<uint8_t> first_part, std::vector<uint8_t> second_part) {
     first_part.insert(first_part.end(),second_part.begin(),second_part.end());
     return cry::hash_sha(first_part);
-}
+}*/

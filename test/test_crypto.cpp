@@ -89,4 +89,17 @@ TEST_CASE("SHA2-256 test vectors") {
     }
 }
 
+TEST_CASE("Generating RSA keys", "test keys") {
+    mbedtls_rsa_context priv, pub;
+    mbedtls_rsa_init(&pub, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
+    mbedtls_rsa_init(&priv, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
 
+    cry::generate_keys(&pub,&priv);
+    CHECK(mbedtls_rsa_complete(&priv)==0);
+    CHECK(mbedtls_rsa_complete(&pub)==0);
+    CHECK(mbedtls_rsa_check_pubkey(&pub)==0);
+    CHECK(mbedtls_rsa_check_privkey(&priv)==0);
+    CHECK(mbedtls_rsa_check_pub_priv(&pub, &priv)==0);
+    mbedtls_rsa_free(&pub);
+    mbedtls_rsa_free(&priv);
+}
