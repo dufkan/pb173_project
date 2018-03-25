@@ -53,7 +53,7 @@ std::vector<uint8_t> cry::encrypt_rsa(const std::vector<uint8_t>& data, mbedtls_
 	    result.resize(1);
 	    return result;
     }
-    result.resize(256);
+    result.resize(512);
 
     const char *pers = "rsa_decrypt";
     mbedtls_entropy_context entropy;
@@ -130,7 +130,7 @@ std::vector<uint8_t> cry::get_random_data(size_t len) {
 
 void cry::generate_rsa_keys(mbedtls_rsa_context* rsa_pub, mbedtls_rsa_context* rsa_priv){
     int exponent = 65537;
-    unsigned int key_size = 2048;
+    unsigned int key_size = 4096;
     mbedtls_rsa_context rsa;
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
