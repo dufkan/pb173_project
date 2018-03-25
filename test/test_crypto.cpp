@@ -1,7 +1,4 @@
 #include "../shared/crypto.hpp"
-//#define CATCH_CONFIG_MAIN
-
-#include "catch.hpp"
 
 TEST_CASE("test_padding","function cry::pad, cry::unpad - 'abc'") {
     std::vector<uint8_t> v1 = {0x61, 0x62, 0x63};

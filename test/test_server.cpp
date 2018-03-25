@@ -1,20 +1,15 @@
 #include "../server/server.hpp"
 
-#ifndef CATCH_CONFIG_MAIN
-#define CATCH_CONFIG_MAIN
-#include "catch.hpp"
-#endif
-
 TEST_CASE("File IO", "[file]") {
     SECTION("Read") {
-        REQUIRE_THROWS(read_file("noread"));
-        REQUIRE_THROWS(read_file("noexist"));
-        REQUIRE_NOTHROW(read_file("nowrite"));
+        REQUIRE_THROWS(util::read_file("noread"));
+        REQUIRE_THROWS(util::read_file("noexist"));
+        REQUIRE_NOTHROW(util::read_file("nowrite"));
     }
     SECTION("Write") {
-        REQUIRE_THROWS(write_file("nowrite", {0x00, 0x01, 0x02}));
-        REQUIRE_NOTHROW(write_file("noexist", {0x00, 0x01, 0x02}));
-        REQUIRE_NOTHROW(write_file("noread", {0x00, 0x01, 0x02}));
+        REQUIRE_THROWS(util::write_file("nowrite", {0x00, 0x01, 0x02}));
+        REQUIRE_NOTHROW(util::write_file("noexist", {0x00, 0x01, 0x02}));
+        REQUIRE_NOTHROW(util::write_file("noread", {0x00, 0x01, 0x02}));
     }
 }
 
