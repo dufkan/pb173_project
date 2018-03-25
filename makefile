@@ -23,7 +23,7 @@ smain: server/main.cpp
 	$(CXX) $(CXXOPTS) -o $@ $^ $(LINK)
 
 tests: test/test.cpp
-	$(CXX) $(CXXOPTS) -o $@ $^ $(LINK)
+	$(CXX) -DTESTMODE $(CXXOPTS) -o $@ $^ $(LINK)
 
 clean:
 	rm -rf $(TEST_JUNK) cmain smain tests

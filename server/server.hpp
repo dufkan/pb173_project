@@ -18,9 +18,11 @@
 #include "../shared/util.hpp"
 
 class Server {
+#ifdef TESTMODE
 public:
+#endif
     std::map<std::string, Channel> connections;
-
+public:
     std::vector<std::string> get_connected_users() {
         std::vector<std::string> connected;
         connected.reserve(connections.size());
