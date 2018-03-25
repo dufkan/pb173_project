@@ -32,7 +32,11 @@ public:
         data.insert(std::end(data), std::begin(val), std::end(val));
     }
 
-    std::vector<uint8_t> get() {
+    std::vector<uint8_t> move() {
+        return std::move(data);
+    }
+
+    const std::vector<uint8_t>& get() const {
         return std::move(data);
     }
 

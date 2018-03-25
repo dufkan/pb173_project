@@ -8,27 +8,50 @@
 #include "../shared/messages.hpp"
 #include "../shared/channel.hpp"
 #include "../shared/crypto.hpp"
+#include "../shared/codec.hpp"
 
 class Client {
     Channel chan;
+
+    std::vector<uint8_t> client_challenge(std::array<uint8_t, 32> Rc, mbedtls_rsa_context* rsa_pub, std::vector<uint8_t> pseudo, std::vector<uint8_t> key) {
+        Encoder e;
+        std::vector<uint8_t> eRc = cry::encrypt_rsa(Rc, rsa_pub);
+
+        e.put(static_cast<uint16_t>(pseudo.size()));
+        e.put(pseudo);
+        e.put(static_cast<uint16_t>(key.size()));
+        e.put(key);
+
+        std::vector<uint8_t> payload = e.move();
+        std::vector<uint8_t> ePayload = cry::encrypt_aes(payload, {}, Rc);
+
+        e.put(eRc);
+        e.put(ePayload);
+
+        return e.move();
+    }
+
+    std::vector<uint8_t> client_response(std::array<uint8_t, 32> K,  std::array<uint8_t, 32> Rs) {
+        std::vector<uint8_t> msg = cry::encrypt_aes(Rs, {}, K);
+        return msg;
+    }
+
 public:
     /**
      * Initiate a connection to server
      */
     void initiate_connection() {
-        std::vector<uint8_t> Rc = cry::get_random_data(256);
-        //generate Rc
-        //encrypt Rc using pubkey
-        //encrypt pseudonym and possibly pubkey using Rc
-        //compute HMAC
-        //form message
-        //send message
-        //recieve response
-        //decrypt Rs using privkey
-        //decrypt Rc using Rs and verify it
-        //compute K = sha(Rs || Rc)
-        //encrypt Rs using K and send it to server
-        //initialize Channel with key K
+        //send(msg);
+        // encrypt pseudonym and possibly pubkey using Rc
+        // compute HMAC
+        // form message
+        // send message
+        // recieve response
+        // decrypt Rs using privkey
+        // decrypt Rc using Rs and verify it
+        // compute K = sha(Rs || Rc)
+        // encrypt Rs using K and send it to server
+        // initialize Channel with key K
     }
 };
 

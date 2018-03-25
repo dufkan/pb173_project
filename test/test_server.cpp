@@ -1,10 +1,5 @@
 #include "../server/server.hpp"
 
-#ifndef CATCH_CONFIG_MAIN
-#define CATCH_CONFIG_MAIN
-#include "catch.hpp"
-#endif
-
 TEST_CASE("File IO", "[file]") {
     SECTION("Read") {
         REQUIRE_THROWS(util::read_file("noread"));

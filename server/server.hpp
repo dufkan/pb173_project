@@ -14,6 +14,7 @@
 #include "../shared/messages.hpp"
 #include "../shared/crypto.hpp"
 #include "../shared/channel.hpp"
+#include "../shared/codec.hpp"
 #include "../shared/util.hpp"
 
 class Server {
@@ -34,6 +35,17 @@ public:
      * key agreement, creation of channel.
      */
     void handle_new_connection() {
+    }
+
+    std::vector<uint8_t> server_chr(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> Rc,  mbedtls_rsa_context* rsa_pub) {
+        Encoder e;
+        std::vector<uint8_t> eRs = cry::encrypt_rsa(Rs, rsa_pub);
+        std::vector<uint8_t> eRc = cry::encrypt_aes(Rc, {}, Rs);
+
+        e.put(eRs);
+        e.put(eRc);
+
+        return e.move();
     }
 };
 
@@ -76,7 +88,16 @@ public:
  * @param pubkey Public key of the user
  * @return False if user already exists; true otherwise
  */
-bool add_user(std::string pseudonym, std::vector<uint8_t> pubkey);
+bool add_user(std::string pseudonym, std::vector<uint8_t> pubkey) {
+    std::ifstream ifs{pseudonym};
+    if(ifs.good())
+        return false;
+
+    ifs.close();
+
+    util::write_file(pseudonym, pubkey);
+    return true;
+}
 
 /**
  * Remove user from the database.
@@ -84,7 +105,9 @@ bool add_user(std::string pseudonym, std::vector<uint8_t> pubkey);
  * @param pseudonym Pseudonym of the user
  * @return True if operation succeded; false otherwise
  */
-bool remove_user(std::string pseudonym);
+bool remove_user(std::string pseudonym) {
+    return !std::remove(pseudonym.c_str());
+}
 
 /**
  * Get user information from database.
@@ -93,6 +116,8 @@ bool remove_user(std::string pseudonym);
  *
  * @return Information about the user (public key)
  */
-std::vector<uint8_t> get_user(std::string pseudonym);
+std::vector<uint8_t> get_user(std::string pseudonym) {
+    return util::read_file(pseudonym);
+}
 
 #endif
