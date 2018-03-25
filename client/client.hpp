@@ -6,8 +6,31 @@
 
 #include "asio.hpp"
 #include "../shared/messages.hpp"
+#include "../shared/channel.hpp"
 #include "../shared/crypto.hpp"
 
+class Client {
+    Channel chan;
+public:
+    /**
+     * Initiate a connection to server
+     */
+    void initiate_connection() {
+        std::vector<uint8_t> Rc = cry::get_random_data(256);
+        //generate Rc
+        //encrypt Rc using pubkey
+        //encrypt pseudonym and possibly pubkey using Rc
+        //compute HMAC
+        //form message
+        //send message
+        //recieve response
+        //decrypt Rs using privkey
+        //decrypt Rc using Rs and verify it
+        //compute K = sha(Rs || Rc)
+        //encrypt Rs using K and send it to server
+        //initialize Channel with key K
+    }
+};
 
 /**
  * Initiate a connection to server
