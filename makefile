@@ -2,9 +2,9 @@ CXXSTD=14
 CXXFLAGS=-Wall -Wextra -DASIO_STANDALONE
 LINK=libs/mbedtls/library/libmbedcrypto.a -lpthread
 INCLUDE_DIRS=-Ilibs/mbedtls/include/ -Ilibs/asio/include/
-SOURCES_SERVER=server/server.cpp
-SOURCES_CLIENT=client/client.cpp
-SOURCES_OTHER=shared/crypto.cpp
+SOURCES_OTHER=shared/crypto.cpp shared/util.cpp
+SOURCES_SERVER=server/server.cpp $(SOURCES_OTHER)
+SOURCES_CLIENT=client/client.cpp $(SOURCES_OTHER)
 SOURCES_TEST=test/test_server.cpp test/test_crypto.cpp
 SOURCES_TEST_ALL=$(SOURCES_SERVER) $(SOURCES_CLIENT) $(SOURCES_OTHER) $(SOURCES_TEST)
 

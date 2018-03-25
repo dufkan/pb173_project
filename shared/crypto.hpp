@@ -14,7 +14,6 @@
 #include "mbedtls/sha256.h"
 #include "mbedtls/x509.h"
 
-
 namespace cry {
 
 /**
@@ -115,11 +114,6 @@ void generate_keys(mbedtls_rsa_context* rsa_pub, mbedtls_rsa_context* rsa_priv);
  * @return symetric key created from chall and resp
  */ 
 std::array<uint8_t,32> create_symmetric_key(std::vector<uint8_t> first_part, std::vector<uint8_t> second_part);
-
-
-
-
-
 
 } // namespace cry
 

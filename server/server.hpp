@@ -14,6 +14,7 @@
 #include "../shared/messages.hpp"
 #include "../shared/crypto.hpp"
 #include "../shared/channel.hpp"
+#include "../shared/util.hpp"
 
 class Server {
 public:
@@ -67,21 +68,6 @@ public:
  */
 //void send_message(/* asio::tcp::connection& conn */, msg::Message& message);
 
-/**
- * Read contents of file.
- *
- * @param fname Name of file to read from
- * @return File contents
- */
-std::vector<uint8_t> read_file(const std::string& fname);
-
-/**
- * Write vector of bytes into file.
- *
- * @param fname Name of file to write to
- * @param data Bytes to write
- */
-void write_file(const std::string& fname, const std::vector<uint8_t>& data, bool append = false);
 
 /**
  * Add new user to database.
