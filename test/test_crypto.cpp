@@ -118,57 +118,6 @@ TEST_CASE("Get random data", "Get some data") {
     CHECK(v1.size() == 5);
 }
 
-/*
-TEST_CASE("Encryption with rsa", "hruba sila"){
-    size_t i;
-    mbedtls_rsa_context rsa_pub,rsa_priv;
-    mbedtls_entropy_context entropy;
-    mbedtls_ctr_drbg_context ctr_drbg;
-    std::vector<uint8_t> input = {0x35, 0x48, 0x55, 0x68, 0x55, 0x55, 0x65, 0x70};
-    const char *pers = "rsa_encrypt";
-    std::vector<uint8_t> output;
-    output.resize(256);
-
-    mbedtls_rsa_init( &rsa_pub, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
-    mbedtls_rsa_init( &rsa_priv, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
-    
-    cry::generate_rsa_keys(&rsa_pub,&rsa_priv);
-
-    CHECK(mbedtls_rsa_complete(&rsa_priv)==0);
-    CHECK(mbedtls_rsa_complete(&rsa_pub)==0);
-
-    CHECK(mbedtls_rsa_check_pubkey(&rsa_pub)==0);
-    CHECK(mbedtls_rsa_check_privkey(&rsa_priv)==0);
-    CHECK(mbedtls_rsa_check_pub_priv(&rsa_pub, &rsa_priv)==0);    
-        
-    mbedtls_ctr_drbg_init( &ctr_drbg );
-    mbedtls_entropy_init( &entropy );
-    
-    CHECK(mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func,
-                                        &entropy, (const unsigned char *) pers,
-                                        strlen( pers )) ==0);
-    
-    CHECK(mbedtls_rsa_pkcs1_encrypt( &rsa_pub, mbedtls_ctr_drbg_random, &ctr_drbg, MBEDTLS_RSA_PUBLIC, input.size(), input.data(), output.data()) == 0);
-
-    std::vector<uint8_t> result;
-    result.resize(256);
-
-    i=256;
-    CHECK(mbedtls_rsa_pkcs1_decrypt( &rsa_priv, mbedtls_ctr_drbg_random, &ctr_drbg, MBEDTLS_RSA_PRIVATE, &i, output.data(), result.data(), 256 ) ==0);
-
-    
-    //CHECK(input==result);
-
-    mbedtls_ctr_drbg_free( &ctr_drbg );
-    mbedtls_entropy_free( &entropy );
-    mbedtls_rsa_free( &rsa_pub );
-    mbedtls_rsa_free(&rsa_priv);
-
-}
-
-*/
-
-
 
 
 TEST_CASE("Encryption/decryption using RSA 2048","Test using function for generating keys"){
@@ -186,17 +135,17 @@ TEST_CASE("Encryption/decryption using RSA 2048","Test using function for genera
     CHECK(mbedtls_rsa_check_privkey(&priv)==0);
     CHECK(mbedtls_rsa_check_pub_priv(&pub, &priv)==0);
 
-    std::vector<uint8_t> plaintext = cry::get_random_data((size_t) 250);
-    std::vector<uint8_t> plaintext2 = {0x28, 0x35, 0x46}; 
+    std::vector<uint8_t> pl = cry::get_random_data((size_t) 250);
+    std::vector<uint8_t> pl2 = {0x28, 0x35, 0x46}; 
     
-    std::vector<uint8_t> ciphertext = cry::encrypt_rsa(plaintext, &pub);
-    std::vector<uint8_t> ciphertext2 = cry::encrypt_rsa(plaintext2, &pub);
-    //CHECK(ciphertext2.size() == 256);
-
-    std::vector<uint8_t> decrypted = cry::decrypt_rsa(ciphertext,&priv);
-    std::vector<uint8_t> decrypted2 = cry::decrypt_rsa(ciphertext2,&priv);
-    CHECK(memcmp(plaintext.data(),decrypted.data(),plaintext.size())==0);
-    CHECK(memcmp(plaintext2.data(),decrypted2.data(),plaintext2.size())==0);
+    std::vector<uint8_t> cip = cry::encrypt_rsa(pl, &pub);
+    std::vector<uint8_t> cip2 = cry::encrypt_rsa(pl2, &pub);
+    
+    std::vector<uint8_t> dec = cry::decrypt_rsa(cip,&priv);
+    std::vector<uint8_t> dec2 = cry::decrypt_rsa(cip2,&priv);
+    CHECK(memcmp(pl.data(),dec.data(),pl.size())==0);
+    
+    CHECK(memcmp(pl2.data(),dec2.data(),pl2.size())==0);
 
     mbedtls_rsa_free(&pub);
     mbedtls_rsa_free(&priv);

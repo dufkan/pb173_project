@@ -199,20 +199,6 @@ std::vector<uint8_t> get_random_data(size_t len) {
     return result;
 }
 
-template<typename C>
-void random_data(C& data) {
-    mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_entropy_context entropy;
-
-    const char *pers = "some random string";
-
-    mbedtls_entropy_init(&entropy);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-    mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (unsigned char *) pers, strlen(pers));
-    mbedtls_ctr_drbg_random(&ctr_drbg, data.data(), data.size());
-    mbedtls_entropy_free(&entropy);
-    mbedtls_ctr_drbg_free(&ctr_drbg);
-}
 
 /**
  * Create new pair od keys for RSA
@@ -246,6 +232,8 @@ void generate_rsa_keys(mbedtls_rsa_context* rsa_pub, mbedtls_rsa_context* rsa_pr
 
     mbedtls_rsa_import(rsa_pub, &N, NULL, NULL, NULL, &E);
     mbedtls_rsa_import(rsa_priv, &N, &P, &Q, &D, &E);
+    
+    mbedtls_rsa_complete(rsa_priv); mbedtls_rsa_complete(rsa_pub);
 
     mbedtls_mpi_free( &N ); mbedtls_mpi_free( &P ); mbedtls_mpi_free( &Q );
     mbedtls_mpi_free( &D ); mbedtls_mpi_free( &E );
@@ -267,8 +255,9 @@ std::array<uint8_t,32> create_symmetric_key(std::vector<uint8_t> first_part, std
     first_part.insert(first_part.end(),second_part.begin(),second_part.end());
     return cry::hash_sha(first_part);
 */
+} 
 
-} // namespace cry
+// namespace cry
 
 
 #endif
