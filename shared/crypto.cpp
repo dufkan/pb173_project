@@ -1,6 +1,7 @@
 #include "crypto.hpp"
 
 
+
 void cry::pad(std::vector<uint8_t>& data, uint8_t bsize){
     int8_t val = bsize - (data.size() % bsize);
     for(uint8_t i = 0; i < val; ++i)
@@ -46,15 +47,13 @@ std::vector<uint8_t> cry::decrypt_aes(const std::vector<uint8_t>& data, std::arr
 
 std::vector<uint8_t> cry::encrypt_rsa(const std::vector<uint8_t>& data, mbedtls_rsa_context* rsa_pub) {
     std::vector<uint8_t> result;
-    result.resize(data.size());
-    mbedtls_rsa_public( rsa_pub, data.data(), result.data());
-    return result;
-}
+    
 
-
-std::vector<uint8_t> cry::decrypt_rsa(const std::vector<uint8_t>& data,  mbedtls_rsa_context* rsa_priv) {
-    std::vector<uint8_t> result;
-    result.resize(data.size());
+    if((mbedtls_rsa_complete(rsa_pub)!=0) || mbedtls_rsa_check_pubkey(rsa_pub)){
+	    result.resize(1);
+	    return result;
+    }
+    result.resize(256);
 
     const char *pers = "rsa_decrypt";
     mbedtls_entropy_context entropy;
@@ -64,7 +63,31 @@ std::vector<uint8_t> cry::decrypt_rsa(const std::vector<uint8_t>& data,  mbedtls
 
     mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers,strlen(pers));
 
-    mbedtls_rsa_private( rsa_priv, mbedtls_ctr_drbg_random, &ctr_drbg, data.data(), result.data());
+
+    mbedtls_rsa_pkcs1_encrypt(rsa_pub, mbedtls_ctr_drbg_random, &ctr_drbg, MBEDTLS_RSA_PUBLIC, data.size(), data.data(), result.data()); 
+    mbedtls_ctr_drbg_free(&ctr_drbg);
+    mbedtls_entropy_free(&entropy); 
+    return result;
+}
+
+
+std::vector<uint8_t> cry::decrypt_rsa(const std::vector<uint8_t>& data,  mbedtls_rsa_context* rsa_priv) {
+    std::vector<uint8_t> result;
+    result.resize(data.size());
+    if (mbedtls_rsa_complete(rsa_priv)!=0) {
+	    result.resize(1);
+	    return result;
+    }
+    result.resize(512);
+    const char *pers = "rsa_decrypt";
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+    mbedtls_entropy_init(&entropy);
+    size_t i = 256;
+    mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers,strlen(pers));
+
+    mbedtls_rsa_pkcs1_decrypt(rsa_priv, mbedtls_ctr_drbg_random, &ctr_drbg, MBEDTLS_RSA_PRIVATE, &i, data.data(), result.data(),1024);
 
     mbedtls_ctr_drbg_free( &ctr_drbg );
     mbedtls_entropy_free( &entropy );
@@ -105,37 +128,34 @@ std::vector<uint8_t> cry::get_random_data(size_t len) {
 }
 
 
-void cry::generate_keys(mbedtls_rsa_context* rsa_pub, mbedtls_rsa_context* rsa_priv){
+void cry::generate_rsa_keys(mbedtls_rsa_context* rsa_pub, mbedtls_rsa_context* rsa_priv){
     int exponent = 65537;
     unsigned int key_size = 2048;
     mbedtls_rsa_context rsa;
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_mpi N, P, Q, D, E;/*, DP, DQ, QP;*/
+    mbedtls_mpi N, P, Q, D, E;
     const char *pers = "rsa_genkey";
 
-    //mbedtls_rsa_free(rsa_pub);mbedtls_rsa_free(rsa_priv);
-    //mbedtls_rsa_init(rsa_pub, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
-    //mbedtls_rsa_init(rsa_priv, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
+    mbedtls_rsa_free(rsa_pub);mbedtls_rsa_free(rsa_priv);
+    mbedtls_rsa_init(rsa_pub, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
+    mbedtls_rsa_init(rsa_priv, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
     
     mbedtls_ctr_drbg_init( &ctr_drbg );
     mbedtls_rsa_init( &rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
     mbedtls_mpi_init( &N ); mbedtls_mpi_init( &P ); mbedtls_mpi_init( &Q );
-    mbedtls_mpi_init( &D ); mbedtls_mpi_init( &E );/* mbedtls_mpi_init( &DP );
-    mbedtls_mpi_init( &DQ ); mbedtls_mpi_init( &QP );*/
+    mbedtls_mpi_init( &D ); mbedtls_mpi_init( &E );
     mbedtls_entropy_init( &entropy );
     mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy,(const unsigned char *) pers, strlen(pers));
 
     mbedtls_rsa_gen_key( &rsa, mbedtls_ctr_drbg_random, &ctr_drbg, key_size, exponent);
     mbedtls_rsa_export( &rsa, &N, &P, &Q, &D, &E );
-    /*mbedtls_rsa_export_crt( &rsa, &DP, &DQ, &QP)*/
     
     mbedtls_rsa_import(rsa_pub, &N, NULL, NULL, NULL, &E);
     mbedtls_rsa_import(rsa_priv, &N, &P, &Q, &D, &E);
     
     mbedtls_mpi_free( &N ); mbedtls_mpi_free( &P ); mbedtls_mpi_free( &Q );
-    mbedtls_mpi_free( &D ); mbedtls_mpi_free( &E ); /*mbedtls_mpi_free( &DP );
-    mbedtls_mpi_free( &DQ ); mbedtls_mpi_free( &QP );*/
+    mbedtls_mpi_free( &D ); mbedtls_mpi_free( &E );
     mbedtls_rsa_free( &rsa );
     mbedtls_ctr_drbg_free( &ctr_drbg );
     mbedtls_entropy_free( &entropy );

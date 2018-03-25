@@ -105,7 +105,7 @@ std::vector<uint8_t> get_random_data(size_t len);
 * @param prikey - the new private key will be saved here
  * @param pubkey - the new public key will be saved here
  */
-void generate_keys(mbedtls_rsa_context* rsa_pub, mbedtls_rsa_context* rsa_priv);
+void generate_rsa_keys(mbedtls_rsa_context* rsa_pub, mbedtls_rsa_context* rsa_priv);
 
 /**
  * Create key by hashing data from fisrt_part and second_part
