@@ -95,7 +95,7 @@ std::vector<uint8_t> decrypt_aes(const std::vector<uint8_t>& data, std::array<ui
  * @return Vector of encrypted data
  */
 template <typename C>
-std::vector<uint8_t> encrypt_rsa(const C& data,  mbedtls_rsa_context* rsa_pub) {
+std::vector<uint8_t> encrypt_rsa(const C& data, mbedtls_rsa_context* rsa_pub) {
     std::vector<uint8_t> result;
 
     if((mbedtls_rsa_complete(rsa_pub)!=0) || mbedtls_rsa_check_pubkey(rsa_pub)){
@@ -170,7 +170,7 @@ std::array<uint8_t, 32> hash_sha(const std::vector<uint8_t>& data) {
  * @param data - input data
  * @param control_hash
  */
-bool check_hash(std::vector<uint8_t> data, std::array <uint8_t,32> control_hash) {
+bool check_hash(const std::vector<uint8_t>& data, const std::array <uint8_t,32>& control_hash) {
     std::array<uint8_t, 32> act_hash;
     mbedtls_sha256_ret(data.data(), data.size(), act_hash.data(), 0);
     return (act_hash==control_hash);
@@ -250,11 +250,13 @@ void generate_rsa_keys(mbedtls_rsa_context* rsa_pub, mbedtls_rsa_context* rsa_pr
  * @param second_part - data from response
  * @return symetric key created from chall and resp
  */
-/*
-std::array<uint8_t,32> create_symmetric_key(std::vector<uint8_t> first_part, std::vector<uint8_t> second_part);
-    first_part.insert(first_part.end(),second_part.begin(),second_part.end());
-    return cry::hash_sha(first_part);
-*/
+
+std::array<uint8_t,32> create_symmetric_key(std::vector<uint8_t> first, std::vector<uint8_t> second) {
+    first.resize(first.size() + second.size());
+    first.insert(first.end(),second.begin(),second.end());
+    return cry::hash_sha(first);
+}
+
 } 
 
 // namespace cry
