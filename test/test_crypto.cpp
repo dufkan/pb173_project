@@ -47,10 +47,14 @@ TEST_CASE("AES-256 CBC test vectors", "first") {
     std::vector<uint8_t> ciphertext4 = {0xb2, 0xeb, 0x05, 0xe2, 0xc3, 0x9b, 0xe9, 0xfc, 0xda, 0x6c, 0x19, 0x07, 0x8c, 0x6a, 0x9d, 0x1b};
 
     SECTION("encryption") {
-        REQUIRE(cry::encrypt_aes(plaintext, iv, key) == ciphertext);
-	REQUIRE(cry::encrypt_aes(plaintext2, iv2, key) == ciphertext2);
-	REQUIRE(cry::encrypt_aes(plaintext3, iv3, key) == ciphertext3);
-	REQUIRE(cry::encrypt_aes(plaintext4, iv4, key) == ciphertext4);
+	auto enc = cry::encrypt_aes(plaintext, iv, key);
+     	auto enc2 = cry::encrypt_aes(plaintext2, iv2, key);
+	auto enc3 = cry::encrypt_aes(plaintext3, iv3, key);
+	auto enc4 = cry::encrypt_aes(plaintext4, iv4, key);
+	REQUIRE(memcmp(enc.data(),ciphertext.data(),ciphertext.size())==0);
+	REQUIRE(memcmp(enc2.data(), ciphertext2.data(), ciphertext2.size())==0);
+	REQUIRE(memcmp(enc3.data(), ciphertext3.data(),ciphertext3.size())==0);
+	REQUIRE(memcmp(enc4.data(),ciphertext4.data(),ciphertext4.size())==0);
     }
 
     SECTION("decryption") {
