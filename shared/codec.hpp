@@ -5,6 +5,9 @@
 #include <stdexcept>
 
 class Encoder {
+#ifdef TESTMODE
+public:
+#endif
     std::vector<uint8_t> data;
 
 public:
@@ -46,6 +49,9 @@ public:
 };
 
 class Decoder {
+#ifdef TESTMODE
+public:
+#endif
     std::vector<uint8_t> data;
     size_t i = 0;
 
@@ -83,6 +89,10 @@ public:
         check_read(len);
         i += len;
         return std::vector<uint8_t>{data.begin() + (i - len), data.begin() + i};
+    }
+
+    inline std::vector<uint8_t> get_vec() {
+        return get_vec(data.size() - i);
     }
 
     std::string get_str(size_t len) {

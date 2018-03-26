@@ -52,13 +52,15 @@ void unpad(std::vector<uint8_t>& data, uint8_t bsize) {
  */
 template <typename C>
 std::vector<uint8_t> encrypt_aes(const C& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key) {
+    std::vector<uint8_t> mut_data{std::begin(data), std::end(data)};
+    pad(mut_data, 32);
     std::vector<uint8_t> result;
-    result.resize(data.size());
+    result.resize(mut_data.size());
 
     mbedtls_aes_context ctx;
     mbedtls_aes_init(&ctx);
     mbedtls_aes_setkey_enc(&ctx, key.data(), 256);
-    mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_ENCRYPT, data.size(), iv.data(), data.data(), result.data());
+    mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_ENCRYPT, mut_data.size(), iv.data(), mut_data.data(), result.data());
     mbedtls_aes_free(&ctx);
 
     return result;
@@ -83,6 +85,7 @@ std::vector<uint8_t> decrypt_aes(const std::vector<uint8_t>& data, std::array<ui
     mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_DECRYPT, data.size(), iv.data(), data.data(), result.data());
     mbedtls_aes_free(&ctx);
 
+    unpad(result, 32);
     return result;
 }
 
@@ -197,6 +200,21 @@ std::vector<uint8_t> get_random_data(size_t len) {
     mbedtls_entropy_free(&entropy);
     mbedtls_ctr_drbg_free(&ctr_drbg);
     return result;
+}
+
+template<typename C>
+void random_data(C& data) {
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_entropy_context entropy;
+
+    const char *pers = "some random string";
+
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+    mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (unsigned char *) pers, strlen(pers));
+    mbedtls_ctr_drbg_random( &ctr_drbg, data.data(), data.size());
+    mbedtls_entropy_free(&entropy);
+    mbedtls_ctr_drbg_free(&ctr_drbg);
 }
 
 
