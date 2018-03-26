@@ -93,9 +93,6 @@ TEST_CASE("Generating RSA keys", "Testing public and private keys") {
     mbedtls_rsa_init(&priv, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
 
     cry::generate_rsa_keys(&pub,&priv);
-
-    CHECK(mbedtls_rsa_complete(&priv)==0);
-    CHECK(mbedtls_rsa_complete(&pub)==0);
     
     CHECK(mbedtls_rsa_check_pubkey(&pub)==0);
     CHECK(mbedtls_rsa_check_privkey(&priv)==0);
@@ -128,9 +125,6 @@ TEST_CASE("Encryption/decryption using RSA 2048","Test using function for genera
     
     cry::generate_rsa_keys(&pub, &priv);
     
-    CHECK(mbedtls_rsa_complete(&priv)==0);
-    CHECK(mbedtls_rsa_complete(&pub)==0);
-
     CHECK(mbedtls_rsa_check_pubkey(&pub)==0);
     CHECK(mbedtls_rsa_check_privkey(&priv)==0);
     CHECK(mbedtls_rsa_check_pub_priv(&pub, &priv)==0);
@@ -150,4 +144,13 @@ TEST_CASE("Encryption/decryption using RSA 2048","Test using function for genera
     mbedtls_rsa_free(&pub);
     mbedtls_rsa_free(&priv);
 
+} 
+
+
+TEST_CASE("MAC data","genereting and checking") {
+    std::vector<uint8_t> data = cry::get_random_data((size_t) 256);
+    std::array<uint8_t,32> data2 = {*(data.data())};
+    std::array<uint8_t,32> mac_output = cry::mac_data(data,data2);
+
+    CHECK(cry::check_mac(data, data2, mac_output));
 }

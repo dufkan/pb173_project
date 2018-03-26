@@ -7,6 +7,8 @@
 #include <cstring>
 #include "mbedtls/aes.h"
 #include "mbedtls/bignum.h"
+#include "mbedtls/cmac.h"
+#include "mbedtls/cipher.h"
 #include "mbedtls/config.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/entropy.h"
@@ -275,8 +277,25 @@ std::array<uint8_t,32> create_symmetric_key(std::vector<uint8_t> first, std::vec
     return cry::hash_sha(first);
 }
 
+template <typename C>
+std::array<uint8_t, 32> mac_data(const C& data, std::array<uint8_t, 32> key) {
+    const mbedtls_cipher_info_t *cipher_info;
+    cipher_info = mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_256_CBC);
+    std::array<uint8_t, 32> output;
+
+    mbedtls_cipher_cmac(cipher_info, key.data(), key.size(), data.data(), data.size(), output.data());
+    return output; 
 } 
 
+
+
+template <typename C>
+bool check_mac(const C& data, std::array<uint8_t, 32> key, std::array<uint8_t, 32> mac_to_check) {
+    std::array<uint8_t, 32> act_mac = cry::mac_data(data, key);
+    return !(act_mac == mac_to_check);
+}
+
+}
 // namespace cry
 
 
