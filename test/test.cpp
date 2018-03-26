@@ -8,9 +8,6 @@
 #include "test_server.cpp"
 
 TEST_CASE("Challenge-Response") {
-
-    // TODO REFACTOR!
-
     Client c;
     Server s;
 
@@ -28,57 +25,28 @@ TEST_CASE("Challenge-Response") {
     std::array<uint8_t, 32> Rc;
     cry::random_data(Rc);
 
-    std::string pseudo = "TEST";
-    std::vector<uint8_t> cchal = c.client_challenge(Rc, spub, pseudo, {});
+    std::string pseudonym = "TEST";
+    auto client_challenge = c.client_challenge(Rc, spub, pseudonym, {});
+    auto [server_Rc, server_pseudonym, server_key] = s.decode_client_challenge(client_challenge, spriv);
 
-    Decoder d{cchal};
-    std::vector<uint8_t> parsed_eRc = d.get_vec(512);
-    std::vector<uint8_t> parsed_payload = d.get_vec();
-
-
-    auto dRc = cry::decrypt_rsa(parsed_eRc, spriv);
-    std::array<uint8_t, 32> dRca;
-    std::copy(dRc.data(), dRc.data() + 32, dRca.data());
-    REQUIRE(dRca == Rc); // Rc transfer ok
-
-    auto payload = cry::decrypt_aes(parsed_payload, {}, dRca);
-    Decoder dp{payload};
-    auto plen = dp.get_u16();
-    auto ps = dp.get_str(plen);
-    auto klen = dp.get_u16();
-    auto key = dp.get_vec(klen);
-
-    REQUIRE(plen == 4);
-    REQUIRE(ps == pseudo);
+    REQUIRE(server_Rc == Rc); // Rc transfer successful
+    REQUIRE(server_pseudonym == pseudonym);
 
     std::array<uint8_t, 32> Rs;
     cry::random_data(Rs);
-    auto schal = s.server_chr(Rs, Rc, cpub);
 
-    Decoder ds{schal};
-    auto parsed_eRs = ds.get_vec(512);
-    auto parsed_payloads = ds.get_vec();
+    auto server_challenge = s.server_chr(Rs, server_Rc, cpub);
+    auto [client_Rs, verify_Rc] = c.decode_server_chr(server_challenge, cpriv);
 
-    auto dRs = cry::decrypt_rsa(parsed_eRs, cpriv);
-    std::array<uint8_t, 32> dRsa;
-    std::copy(dRs.data(), dRs.data() + 32, dRsa.data());
-    REQUIRE(dRsa == Rs); // Rs transfer ok
-
-    auto payloads = cry::decrypt_aes(parsed_payloads, {}, dRsa);
-    Decoder dps{payloads};
-    auto dunno = dps.get_vec();
-    std::array<uint8_t, 32> Rc_verify;
-    std::copy(dunno.data(), dunno.data() + 32, Rc_verify.data());
-    REQUIRE(Rc_verify == Rc); // Server authenticated
+    REQUIRE(Rs == client_Rs); // Rs transfer successful
+    REQUIRE(verify_Rc == Rc); // server authenticated
 
     Encoder e;
     e.put(Rs);
     e.put(Rc);
     auto K = cry::hash_sha(e.move());
 
-    auto fin = c.client_response(K, Rs);
-    auto ok = cry::decrypt_aes(fin, {}, K);
-    std::array<uint8_t, 32> Rs_verify;
-    std::copy(ok.data(), ok.data() + 32, Rs_verify.data());
-    REQUIRE(Rs_verify == Rs); // Client authenticated
+    auto client_response = c.client_response(K, Rs);
+    auto verify_Rs = s.decode_client_response(client_response, K);
+    REQUIRE(verify_Rs == Rs); // client authenticated
 }

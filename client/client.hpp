@@ -39,6 +39,24 @@ public:
         return msg;
     }
 
+    std::pair<std::array<uint8_t, 32>, std::array<uint8_t, 32>> decode_server_chr(const std::vector<uint8_t>& msg, mbedtls_rsa_context* priv_key) {
+        Decoder d{msg};
+        auto eRs = d.get_vec(512);
+        auto epayload = d.get_vec();
+
+        std::vector<uint8_t> dRs = cry::decrypt_rsa(eRs, priv_key);
+        std::array<uint8_t, 32> Rs;
+        std::copy(dRs.data(), dRs.data() + 32, Rs.data());
+
+        std::vector<uint8_t> dpayload = cry::decrypt_aes(epayload, {}, Rs);
+        d = dpayload; // copy assignment hopefully
+        std::vector<uint8_t> tmp = d.get_vec();
+        std::array<uint8_t, 32> verify_Rc;
+        std::copy(tmp.data(), tmp.data() + 32, verify_Rc.data());
+
+        return {Rs, verify_Rc};
+    }
+
 public:
     /**
      * Initiate a connection to server

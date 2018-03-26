@@ -49,6 +49,33 @@ public:
 
         return e.move();
     }
+
+    std::tuple<std::array<uint8_t, 32>, std::string, std::vector<uint8_t>> decode_client_challenge(const std::vector<uint8_t>& msg, mbedtls_rsa_context* rsa_priv) {
+        Decoder d{msg};
+        std::vector<uint8_t> eRc = d.get_vec(512);
+        std::vector<uint8_t> epayload = d.get_vec();
+
+        std::vector<uint8_t> dRc = cry::decrypt_rsa(eRc, rsa_priv);
+        std::array<uint8_t, 32> Rc;
+        std::copy(dRc.data(), dRc.data() + 32, Rc.data());
+
+        auto dpayload = cry::decrypt_aes(epayload, {}, Rc);
+        d = dpayload; // copy assignment hopefully
+        auto plen = d.get_u16();
+        auto pseudonym = d.get_str(plen);
+        auto klen = d.get_u16();
+        auto key = d.get_vec(klen);
+
+        return {Rc, pseudonym, key};
+    }
+
+    std::array<uint8_t, 32> decode_client_response(const std::vector<uint8_t>& msg, const std::array<uint8_t, 32>& K) {
+        auto ok = cry::decrypt_aes(msg, {}, K);
+        std::array<uint8_t, 32> verify_Rs;
+        std::copy(ok.data(), ok.data() + 32, verify_Rs.data());
+        return verify_Rs;
+    }
+
 };
 
 /**
