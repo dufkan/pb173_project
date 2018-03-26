@@ -93,9 +93,6 @@ TEST_CASE("Generating RSA keys", "Testing public and private keys") {
     mbedtls_rsa_init(&priv, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
 
     cry::generate_rsa_keys(&pub,&priv);
-
-    CHECK(mbedtls_rsa_complete(&priv)==0);
-    CHECK(mbedtls_rsa_complete(&pub)==0);
     
     CHECK(mbedtls_rsa_check_pubkey(&pub)==0);
     CHECK(mbedtls_rsa_check_privkey(&priv)==0);
@@ -128,9 +125,6 @@ TEST_CASE("Encryption/decryption using RSA 2048","Test using function for genera
     
     cry::generate_rsa_keys(&pub, &priv);
     
-    CHECK(mbedtls_rsa_complete(&priv)==0);
-    CHECK(mbedtls_rsa_complete(&pub)==0);
-
     CHECK(mbedtls_rsa_check_pubkey(&pub)==0);
     CHECK(mbedtls_rsa_check_privkey(&priv)==0);
     CHECK(mbedtls_rsa_check_pub_priv(&pub, &priv)==0);
