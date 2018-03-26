@@ -149,7 +149,8 @@ TEST_CASE("Encryption/decryption using RSA 2048","Test using function for genera
 
 TEST_CASE("MAC data","genereting and checking") {
     std::vector<uint8_t> data = cry::get_random_data((size_t) 256);
-    std::array<uint8_t,32> data2 = {*(data.data())};
+    std::array<uint8_t,32> data2;
+    cry::random_data(data2);
     std::array<uint8_t,32> mac_output = cry::mac_data(data,data2);
 
     CHECK(cry::check_mac(data, data2, mac_output));

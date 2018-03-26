@@ -25,8 +25,11 @@ smain: server/main.cpp
 tests: test/test.cpp
 	$(CXX) -DTESTMODE $(CXXOPTS) -o $@ $^ $(LINK)
 
-clean:
-	rm -rf $(TEST_JUNK) cmain smain tests
+mbedtls-clean:
+	cd libs/mbedtls && $(MAKE) clean
 
 mbedtls:
 	cd libs/mbedtls && $(MAKE) lib
+
+clean: mbedtls-clean
+	rm -rf $(TEST_JUNK) cmain smain tests

@@ -16,7 +16,7 @@ public:
 #endif
     Channel chan;
 
-    std::vector<uint8_t> client_challenge(std::array<uint8_t, 32> Rc, mbedtls_rsa_context* rsa_pub, std::vector<uint8_t> pseudo, std::vector<uint8_t> key) {
+    std::vector<uint8_t> client_challenge(std::array<uint8_t, 32> Rc, mbedtls_rsa_context* rsa_pub, std::string pseudo, std::vector<uint8_t> key) {
         Encoder e;
         std::vector<uint8_t> eRc = cry::encrypt_rsa(Rc, rsa_pub);
 

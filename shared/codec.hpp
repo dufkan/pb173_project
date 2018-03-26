@@ -3,6 +3,7 @@
 #include <vector>
 #include <cstdint>
 #include <stdexcept>
+#include <algorithm>
 
 class Encoder {
 #ifdef TESTMODE
@@ -32,6 +33,11 @@ public:
     }
 
     void put(const std::string& val) {
+        data.insert(std::end(data), std::begin(val), std::end(val));
+    }
+
+    template<size_t N>
+    void put(const std::array<uint8_t, N>& val) {
         data.insert(std::end(data), std::begin(val), std::end(val));
     }
 
@@ -93,6 +99,14 @@ public:
 
     inline std::vector<uint8_t> get_vec() {
         return get_vec(data.size() - i);
+    }
+
+    template<size_t N>
+    std::array<uint8_t, N> get_arr() {
+        std::array<uint8_t, N> arr;
+        std::copy(data.data() + i, data.data() + i + N, arr.data());
+        i += N;
+        return arr;
     }
 
     std::string get_str(size_t len) {
