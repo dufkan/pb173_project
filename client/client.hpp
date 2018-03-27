@@ -16,7 +16,7 @@ public:
 #endif
     Channel chan;
 
-    std::vector<uint8_t> client_challenge(std::array<uint8_t, 32> Rc, mbedtls_rsa_context* rsa_pub, std::string pseudo, std::vector<uint8_t> key) {
+    std::vector<uint8_t> client_challenge(std::array<uint8_t, 32> Rc, cry::RSAKey& rsa_pub, std::string pseudo, std::vector<uint8_t> key) {
         Encoder e;
         std::vector<uint8_t> eRc = cry::encrypt_rsa(Rc, rsa_pub);
 
@@ -39,7 +39,7 @@ public:
         return msg;
     }
 
-    std::pair<std::array<uint8_t, 32>, std::array<uint8_t, 32>> decode_server_chr(const std::vector<uint8_t>& msg, mbedtls_rsa_context* priv_key) {
+    std::pair<std::array<uint8_t, 32>, std::array<uint8_t, 32>> decode_server_chr(const std::vector<uint8_t>& msg, cry::RSAKey& priv_key) {
         Decoder d{msg};
         auto eRs = d.get_vec(512);
         auto epayload = d.get_vec();
@@ -62,7 +62,8 @@ public:
      * Initiate a connection to server
      */
     void initiate_connection() {
-        //send(msg);
+        // generate Rc
+        // encrypt Rc using pub_key_server
         // encrypt pseudonym and possibly pubkey using Rc
         // compute HMAC
         // form message
@@ -75,14 +76,6 @@ public:
         // initialize Channel with key K
     }
 };
-
-/**
- * Initiate a connection to server
- *
- * @param server
- */
-//void initiate_connection(/* asio::tcp server*/); 
-
 
 /**
  * Create message - for choosed pseudonym write the text of message.
@@ -175,14 +168,4 @@ public:
  * @param conn - connection which should be closed
  */
 //void close_connection(/*asio::tcp::connection& conn*/);
-
-
-/**
- * Login user - initialization of the connection, challenge response protocol and return symetric key for the connection
- * 
- * @param conn - connection
- * @param pubkey - public key of the server 
- */
-
-//std::vector<uint8_t> login(/*asio::tcp::connection& conn*/, std::vector<uint8_t> pubkey);
 #endif

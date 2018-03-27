@@ -91,19 +91,14 @@ TEST_CASE("SHA2-256 test vectors") {
 }
 
 TEST_CASE("Generating RSA keys", "Testing public and private keys") {
-    mbedtls_rsa_context priv, pub;
-        
-    mbedtls_rsa_init(&pub, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
-    mbedtls_rsa_init(&priv, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
+    cry::RSAKey priv, pub;
 
-    cry::generate_rsa_keys(&pub,&priv);
-    
-    CHECK(mbedtls_rsa_check_pubkey(&pub)==0);
-    CHECK(mbedtls_rsa_check_privkey(&priv)==0);
-    CHECK(mbedtls_rsa_check_pub_priv(&pub, &priv)==0);
-    
-    mbedtls_rsa_free(&pub);
-    mbedtls_rsa_free(&priv);
+    cry::generate_rsa_keys(pub, priv);
+
+    CHECK(pub.has_pub());
+    CHECK(!pub.has_priv());
+    CHECK(priv.has_pub());
+    CHECK(priv.has_priv());
 }
 
 
@@ -122,33 +117,28 @@ TEST_CASE("Get random data", "Get some data") {
 
 
 TEST_CASE("Encryption/decryption using RSA 2048","Test using function for generating keys"){
-    mbedtls_rsa_context priv, pub;
-    
-    mbedtls_rsa_init(&pub, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
-    mbedtls_rsa_init(&priv, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
-    
-    cry::generate_rsa_keys(&pub, &priv);
-    
-    CHECK(mbedtls_rsa_check_pubkey(&pub)==0);
-    CHECK(mbedtls_rsa_check_privkey(&priv)==0);
-    CHECK(mbedtls_rsa_check_pub_priv(&pub, &priv)==0);
+    cry::RSAKey priv, pub;
 
-    std::vector<uint8_t> pl = cry::get_random_data((size_t) 250);
-    std::vector<uint8_t> pl2 = {0x28, 0x35, 0x46}; 
-    
-    std::vector<uint8_t> cip = cry::encrypt_rsa(pl, &pub);
-    std::vector<uint8_t> cip2 = cry::encrypt_rsa(pl2, &pub);
-    
-    std::vector<uint8_t> dec = cry::decrypt_rsa(cip,&priv);
-    std::vector<uint8_t> dec2 = cry::decrypt_rsa(cip2,&priv);
+    cry::generate_rsa_keys(pub, priv);
+
+    CHECK(pub.has_pub());
+    CHECK(!pub.has_priv());
+    CHECK(priv.has_pub());
+    CHECK(priv.has_priv());
+
+    std::vector<uint8_t> pl;
+    pl.resize(250);
+    cry::random_data(pl);
+    std::vector<uint8_t> pl2 = {0x28, 0x35, 0x46};
+
+    std::vector<uint8_t> cip = cry::encrypt_rsa(pl, pub);
+    std::vector<uint8_t> cip2 = cry::encrypt_rsa(pl2, pub);
+
+    std::vector<uint8_t> dec = cry::decrypt_rsa(cip, priv);
+    std::vector<uint8_t> dec2 = cry::decrypt_rsa(cip2, priv);
     CHECK(memcmp(pl.data(),dec.data(),pl.size())==0);
-    
     CHECK(memcmp(pl2.data(),dec2.data(),pl2.size())==0);
-
-    mbedtls_rsa_free(&pub);
-    mbedtls_rsa_free(&priv);
-
-} 
+}
 
 
 TEST_CASE("MAC data","genereting and checking") {
@@ -158,4 +148,25 @@ TEST_CASE("MAC data","genereting and checking") {
     std::array<uint8_t,32> mac_output = cry::mac_data(data,data2);
 
     CHECK(cry::check_mac(data, data2, mac_output));
+}
+
+TEST_CASE("RSAKey") {
+    cry::RSAKey k;
+    cry::RSAKey kpub;
+    cry::RSAKey kpriv;
+
+    REQUIRE(!k.has_pub());
+    REQUIRE(!k.has_priv());
+
+    cry::generate_rsa_keys(k, k);
+    cry::generate_rsa_keys(kpub, kpriv);
+
+    REQUIRE(k.has_pub());
+    REQUIRE(k.has_priv());
+
+    REQUIRE(kpub.has_pub());
+    REQUIRE(!kpub.has_priv());
+
+    REQUIRE(kpriv.has_pub());
+    REQUIRE(kpriv.has_priv());
 }

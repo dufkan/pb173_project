@@ -5,6 +5,7 @@
 #include <array>
 #include <stdint.h> 
 #include <cstring>
+#include <utility>
 #include "mbedtls/aes.h"
 #include "mbedtls/bignum.h"
 #include "mbedtls/cmac.h"
@@ -17,6 +18,44 @@
 #include "mbedtls/x509.h"
 
 namespace cry {
+
+class RSAKey {
+    mbedtls_rsa_context ctx[1];
+public:
+    RSAKey() {
+        mbedtls_rsa_init(ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
+    }
+
+    RSAKey(const RSAKey& other) {
+        mbedtls_rsa_copy(ctx, other.ctx);
+    }
+
+    RSAKey& operator=(const RSAKey& other) {
+        mbedtls_rsa_free(ctx);
+        mbedtls_rsa_copy(ctx, other.ctx);
+        return *this;
+    }
+
+    mbedtls_rsa_context* get() {
+        return ctx;
+    }
+
+    const mbedtls_rsa_context* get() const {
+        return ctx;
+    }
+
+    bool has_pub() const {
+        return mbedtls_rsa_check_pubkey(ctx) == 0;
+    }
+
+    bool has_priv() const {
+        return mbedtls_rsa_check_privkey(ctx) == 0;
+    }
+
+    ~RSAKey() {
+        mbedtls_rsa_free(ctx);
+    }
+};
 
 /**
  * Pad given data vector using PKCS#7 padding method
@@ -100,13 +139,12 @@ std::vector<uint8_t> decrypt_aes(const std::vector<uint8_t>& data, std::array<ui
  * @return Vector of encrypted data
  */
 template <typename C>
-std::vector<uint8_t> encrypt_rsa(const C& data, mbedtls_rsa_context* rsa_pub) {
+std::vector<uint8_t> encrypt_rsa(const C& data, RSAKey& key) {
     std::vector<uint8_t> result;
 
-    if((mbedtls_rsa_complete(rsa_pub)!=0) || mbedtls_rsa_check_pubkey(rsa_pub)){
-        result.resize(1);
+    if(!key.has_pub())
         return result;
-    }
+
     result.resize(512);
 
     const char *pers = "rsa_decrypt";
@@ -118,7 +156,7 @@ std::vector<uint8_t> encrypt_rsa(const C& data, mbedtls_rsa_context* rsa_pub) {
     mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers,strlen(pers));
 
 
-    mbedtls_rsa_pkcs1_encrypt(rsa_pub, mbedtls_ctr_drbg_random, &ctr_drbg, MBEDTLS_RSA_PUBLIC, data.size(), data.data(), result.data());
+    mbedtls_rsa_pkcs1_encrypt(key.get(), mbedtls_ctr_drbg_random, &ctr_drbg, MBEDTLS_RSA_PUBLIC, data.size(), data.data(), result.data());
     mbedtls_ctr_drbg_free(&ctr_drbg);
     mbedtls_entropy_free(&entropy);
     return result;
@@ -133,23 +171,22 @@ std::vector<uint8_t> encrypt_rsa(const C& data, mbedtls_rsa_context* rsa_pub) {
  *
  * @return Vector of encrypted data
  */
-std::vector<uint8_t> decrypt_rsa(const std::vector<uint8_t>& data, mbedtls_rsa_context* rsa_priv) {
+std::vector<uint8_t> decrypt_rsa(const std::vector<uint8_t>& data, cry::RSAKey& key) {
     std::vector<uint8_t> result;
-    result.resize(data.size());
-    if (mbedtls_rsa_complete(rsa_priv)!=0) {
-            result.resize(1);
-            return result;
-    }
+    if (!key.has_priv())
+        return result;
+
     result.resize(512);
     const char *pers = "rsa_decrypt";
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_ctr_drbg_init(&ctr_drbg);
     mbedtls_entropy_init(&entropy);
+
     size_t i = 512;
     mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers,strlen(pers));
 
-    mbedtls_rsa_pkcs1_decrypt(rsa_priv, mbedtls_ctr_drbg_random, &ctr_drbg, MBEDTLS_RSA_PRIVATE, &i, data.data(), result.data(),1024);
+    mbedtls_rsa_pkcs1_decrypt(key.get(), mbedtls_ctr_drbg_random, &ctr_drbg, MBEDTLS_RSA_PRIVATE, &i, data.data(), result.data(), 512);
 
     mbedtls_ctr_drbg_free( &ctr_drbg );
     mbedtls_entropy_free( &entropy );
@@ -181,7 +218,7 @@ bool check_hash(const std::vector<uint8_t>& data, const std::array <uint8_t,32>&
     return (act_hash==control_hash);
 }
 
-/** 
+/**
  * Generate random data of the length len
  *
  * @param len - length of the data
@@ -204,6 +241,11 @@ std::vector<uint8_t> get_random_data(size_t len) {
     return result;
 }
 
+/**
+ * Fill a container with random data
+ *
+ * @param data - container
+ */
 template<typename C>
 void random_data(C& data) {
     mbedtls_ctr_drbg_context ctr_drbg;
@@ -227,7 +269,7 @@ void random_data(C& data) {
  * @param pubkey - the new public key will be saved here
  */
 
-void generate_rsa_keys(mbedtls_rsa_context* rsa_pub, mbedtls_rsa_context* rsa_priv) {
+void generate_rsa_keys(RSAKey& rsa_pub, RSAKey& rsa_priv) {
     int exponent = 65537;
     unsigned int key_size = 4096;
     mbedtls_rsa_context rsa;
@@ -235,10 +277,6 @@ void generate_rsa_keys(mbedtls_rsa_context* rsa_pub, mbedtls_rsa_context* rsa_pr
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_mpi N, P, Q, D, E;
     const char *pers = "rsa_genkey";
-
-    mbedtls_rsa_free(rsa_pub);mbedtls_rsa_free(rsa_priv);
-    mbedtls_rsa_init(rsa_pub, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
-    mbedtls_rsa_init(rsa_priv, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
 
     mbedtls_ctr_drbg_init( &ctr_drbg );
     mbedtls_rsa_init( &rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
@@ -250,17 +288,18 @@ void generate_rsa_keys(mbedtls_rsa_context* rsa_pub, mbedtls_rsa_context* rsa_pr
     mbedtls_rsa_gen_key( &rsa, mbedtls_ctr_drbg_random, &ctr_drbg, key_size, exponent);
     mbedtls_rsa_export( &rsa, &N, &P, &Q, &D, &E );
 
-    mbedtls_rsa_import(rsa_pub, &N, NULL, NULL, NULL, &E);
-    mbedtls_rsa_import(rsa_priv, &N, &P, &Q, &D, &E);
-    
-    mbedtls_rsa_complete(rsa_priv); mbedtls_rsa_complete(rsa_pub);
+    mbedtls_rsa_import(rsa_pub.get(), &N, NULL, NULL, NULL, &E);
+    mbedtls_rsa_import(rsa_priv.get(), &N, &P, &Q, &D, &E);
+
+    mbedtls_rsa_complete(rsa_priv.get());
+    mbedtls_rsa_complete(rsa_pub.get());
 
     mbedtls_mpi_free( &N ); mbedtls_mpi_free( &P ); mbedtls_mpi_free( &Q );
     mbedtls_mpi_free( &D ); mbedtls_mpi_free( &E );
     mbedtls_rsa_free( &rsa );
     mbedtls_ctr_drbg_free( &ctr_drbg );
     mbedtls_entropy_free( &entropy );
-}	
+}
 
 
 /**
@@ -295,8 +334,6 @@ bool check_mac(const C& data, std::array<uint8_t, 32> key, std::array<uint8_t, 3
     return !(act_mac == mac_to_check);
 }
 
-}
-// namespace cry
-
+} // namespace cry
 
 #endif

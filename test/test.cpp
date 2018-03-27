@@ -11,12 +11,8 @@ TEST_CASE("Challenge-Response") {
     Client c;
     Server s;
 
-    mbedtls_rsa_context spub[1], spriv[1];
-    mbedtls_rsa_context cpub[1], cpriv[1];
-    mbedtls_rsa_init(spub, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
-    mbedtls_rsa_init(spriv, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
-    mbedtls_rsa_init(cpub, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
-    mbedtls_rsa_init(cpriv, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
+    cry::RSAKey spub, spriv;
+    cry::RSAKey cpub, cpriv;
 
     cry::generate_rsa_keys(spub, spriv);
     cry::generate_rsa_keys(cpub, cpriv);

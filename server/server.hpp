@@ -39,7 +39,7 @@ public:
     void handle_new_connection() {
     }
 
-    std::vector<uint8_t> server_chr(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> Rc,  mbedtls_rsa_context* rsa_pub) {
+    std::vector<uint8_t> server_chr(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> Rc,  cry::RSAKey& rsa_pub) {
         Encoder e;
         std::vector<uint8_t> eRs = cry::encrypt_rsa(Rs, rsa_pub);
         std::vector<uint8_t> eRc = cry::encrypt_aes(Rc, {}, Rs);
@@ -50,7 +50,7 @@ public:
         return e.move();
     }
 
-    std::tuple<std::array<uint8_t, 32>, std::string, std::vector<uint8_t>> decode_client_challenge(const std::vector<uint8_t>& msg, mbedtls_rsa_context* rsa_priv) {
+    std::tuple<std::array<uint8_t, 32>, std::string, std::vector<uint8_t>> decode_client_challenge(const std::vector<uint8_t>& msg, cry::RSAKey& rsa_priv) {
         Decoder d{msg};
         std::vector<uint8_t> eRc = d.get_vec(512);
         std::vector<uint8_t> epayload = d.get_vec();
