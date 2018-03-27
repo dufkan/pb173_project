@@ -16,7 +16,7 @@ public:
 #endif
     Channel chan;
 
-    std::vector<uint8_t> client_challenge(std::array<uint8_t, 32> Rc, mbedtls_rsa_context* rsa_pub, std::vector<uint8_t> pseudo, std::vector<uint8_t> key) {
+    std::vector<uint8_t> client_challenge(std::array<uint8_t, 32> Rc, mbedtls_rsa_context* rsa_pub, std::string pseudo, std::vector<uint8_t> key) {
         Encoder e;
         std::vector<uint8_t> eRc = cry::encrypt_rsa(Rc, rsa_pub);
 
@@ -37,6 +37,24 @@ public:
     std::vector<uint8_t> client_response(std::array<uint8_t, 32> K,  std::array<uint8_t, 32> Rs) {
         std::vector<uint8_t> msg = cry::encrypt_aes(Rs, {}, K);
         return msg;
+    }
+
+    std::pair<std::array<uint8_t, 32>, std::array<uint8_t, 32>> decode_server_chr(const std::vector<uint8_t>& msg, mbedtls_rsa_context* priv_key) {
+        Decoder d{msg};
+        auto eRs = d.get_vec(512);
+        auto epayload = d.get_vec();
+
+        std::vector<uint8_t> dRs = cry::decrypt_rsa(eRs, priv_key);
+        std::array<uint8_t, 32> Rs;
+        std::copy(dRs.data(), dRs.data() + 32, Rs.data());
+
+        std::vector<uint8_t> dpayload = cry::decrypt_aes(epayload, {}, Rs);
+        d = dpayload; // copy assignment hopefully
+        std::vector<uint8_t> tmp = d.get_vec();
+        std::array<uint8_t, 32> verify_Rc;
+        std::copy(tmp.data(), tmp.data() + 32, verify_Rc.data());
+
+        return {Rs, verify_Rc};
     }
 
 public:
