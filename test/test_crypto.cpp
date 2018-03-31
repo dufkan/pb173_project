@@ -5,7 +5,7 @@ TEST_CASE("test_padding","function cry::pad, cry::unpad - 'abc'") {
     std::vector<uint8_t> v2 = v1;
     cry::pad(v1,(uint8_t) 16);
     CHECK(v1.size()==16);
-    
+
     cry::unpad(v1,16);
     CHECK(v1.size()==3);
     CHECK(v1==v2);
@@ -169,4 +169,25 @@ TEST_CASE("RSAKey") {
 
     REQUIRE(kpriv.has_pub());
     REQUIRE(kpriv.has_priv());
+}
+
+TEST_CASE("RSA import and export") {
+    cry::RSAKey k, l;
+    cry::generate_rsa_keys(k, k);
+
+    auto exported = k.export_all();
+
+    REQUIRE(!l.has_pub());
+    REQUIRE(!l.has_priv());
+
+    REQUIRE(!k.is_correct_priv(l));
+    REQUIRE(!l.is_correct_priv(k));
+
+    l.import(exported);
+
+    REQUIRE(l.has_pub());
+    REQUIRE(l.has_priv());
+
+    REQUIRE(k.is_correct_priv(l));
+    REQUIRE(l.is_correct_priv(k));
 }

@@ -41,6 +41,10 @@ public:
         data.insert(std::end(data), std::begin(val), std::end(val));
     }
 
+    void put(const uint8_t* val, size_t len) {
+        data.insert(std::end(data), val, val + len);
+    }
+
     std::vector<uint8_t> move() {
         return std::move(data);
     }
