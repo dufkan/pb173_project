@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <array>
-#include <stdint.h> 
+#include <stdint.h>
 #include <cstring>
 #include <utility>
 #include "mbedtls/aes.h"
@@ -50,6 +50,50 @@ public:
 
     bool has_priv() const {
         return mbedtls_rsa_check_privkey(ctx) == 0;
+    }
+
+    bool is_correct_priv(const RSAKey& other) const {
+        return has_priv() && mbedtls_rsa_check_pub_priv(other.ctx, ctx) == 0;
+    }
+
+    std::vector<uint8_t> export_pub() {
+        Encoder e;
+        std::vector<uint8_t> N, P, Q, D, E;
+        N.resize(1024);
+        P.resize(1024);
+        Q.resize(1024);
+        D.resize(1024);
+        E.resize(1024);
+        mbedtls_rsa_export_raw(ctx, N.data(), 1024, nullptr, 1024, nullptr, 1024, nullptr, 1024, E.data(), 1024);
+        e.put(N);
+        e.put(P);
+        e.put(Q);
+        e.put(D);
+        e.put(E);
+        return e.move();
+    }
+
+    std::vector<uint8_t> export_all() {
+
+        Encoder e;
+        std::vector<uint8_t> N, P, Q, D, E;
+        N.resize(1024);
+        P.resize(1024);
+        Q.resize(1024);
+        D.resize(1024);
+        E.resize(1024);
+        mbedtls_rsa_export_raw(ctx, N.data(), 1024, P.data(), 1024, Q.data(), 1024, D.data(), 1024, E.data(), 1024);
+        e.put(N);
+        e.put(P);
+        e.put(Q);
+        e.put(D);
+        e.put(E);
+        return e.move();
+    }
+
+    void import(const std::vector<uint8_t>& key) {
+        mbedtls_rsa_import_raw(ctx, key.data(), 1024, key.data() + 1024, 1024, key.data() + 2*1024, 1024, key.data() + 3*1024, 1024, key.data() + 4*1024, 1024);
+        mbedtls_rsa_complete(ctx);
     }
 
     ~RSAKey() {
