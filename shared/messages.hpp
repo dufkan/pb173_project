@@ -15,12 +15,12 @@ enum class MessageType : uint8_t {
     Register,
     Login,
     Logout,
-    Challenge,
-    Response,
     Send,
     Receive,
-    ReqKey,
-    RetKey,
+    ReqPrekey,
+    RetPrekey,
+    AskPrekey,
+    UploadPrekey,
 };
 
 /**
@@ -85,7 +85,7 @@ public:
 
     std::vector<uint8_t> serialize() const override {
         Encoder message;
-        message.reserve(name.length() + 1 + 1);
+        message.reserve(name.length() + key.size() + 2 + 1 + 1);
         message.put(static_cast<uint8_t>(MessageType::Register));
         message.put(static_cast<uint8_t>(name.size()));
         message.put(name);
@@ -105,14 +105,67 @@ public:
 };
 
 
-class Challenge : public Message {};
-class Response : public Message {};
-class Send : public Message {};
+/**
+ * Send message - to another user
+ *
+ */
+class Send : public Message {
+    std::string name;    
+    std::vector<uint8_t> text;
+
+public:
+    /**
+     * Create new instance of Send message
+     *
+     * @param name Pseudonym of the reciever of the message
+     * @param ckey Symetric key shared with reciever of the message
+     * @param skey Symetric key shared with the server
+     * @param text Text of message sending to reciever
+     */
+    Send(std::string name, std::vector<uint8_t> text): name(name), text(text) {}
+    
+
+    /**
+     * Deserialize Send message from its binary representation
+     *
+     * @param data Binary representation od Send message (without the first byte AKA type byte)
+     *
+     * @return Unique pointer to the deserialized
+     */
+    static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
+	Decoder message{data};
+	message.get_u8();
+	uint8_t namelen = message.get_u8();
+	std::string name = message.get_str(namelen);
+	uint16_t textlen = message.get_u16();
+        std::vector<uint8_t> text = message.get_vec(textlen);
+	return std::make_unique<Register>(name,text);
+    }
+
+
+    std::vector<uint8_t> serialize() const override {
+        Encoder message;
+	message.reserve(text.size() + name.size() + 1 + 2 + 1);
+	message.put(static_cast<uint8_t>(MessageType::Send));
+        message.put(static_cast<uint8_t>(name.size()));
+	message.put(name);
+	message.put(static_cast<uint16_t>(text.size()));
+	message.put(text);
+	return message.get();
+    }
+};
+
+/**
+ * Recieve message - from another user
+ *
+ */
 class Receive : public Message {};
 class Login : public Message {};
 class Logout : public Message {};
-class ReqKey : public Message {};
-class RetKey : public Message {};
+class ReqPrekey : public Message {};
+class RetPrekey : public Message {};
+class AskPrekey : public Message {};
+class UploadPrekey : public Message {};
 
 /**
  * Deserializer for recreating messages transfered through network
