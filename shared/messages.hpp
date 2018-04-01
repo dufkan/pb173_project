@@ -29,7 +29,7 @@ enum class MessageType : uint8_t {
  * @param msg Binary representation of message
  */
 inline MessageType type(const std::vector<uint8_t>& msg) {
-    return static_cast<MessageType>(msg[2]);
+    return static_cast<MessageType>(msg[0]);
 }
 
 /**
@@ -102,6 +102,10 @@ public:
     std::string get_name() const {
         return name;
     }
+
+    bool operator== (const Register& a) const {
+        return ((name == a.name) && (key == a.key));
+    }
 };
 
 
@@ -152,6 +156,14 @@ public:
 	message.put(static_cast<uint16_t>(text.size()));
 	message.put(text);
 	return message.get();
+    }
+
+    std::string get_name() const {
+        return name;
+    }
+
+    bool operator==(const Send& s) const {
+        return ((name == s.name)&&(text == s.text));
     }
 };
 
