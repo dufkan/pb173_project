@@ -9,6 +9,7 @@
 #include <map>
 #include <cstdio>
 #include <utility>
+#include <queue>
 
 //#include "asio.hpp"
 #include "../shared/messages.hpp"
@@ -22,6 +23,9 @@ class Server {
 public:
 #endif
     std::map<std::string, Channel> connections;
+    std::map<std::string, std::queue<msg::Recv>> message_queue;
+    msg::MessageDeserializer message_deserializer;
+
 public:
     std::vector<std::string> get_connected_users() {
         std::vector<std::string> connected;
@@ -37,6 +41,8 @@ public:
      * key agreement, creation of channel.
      */
     void handle_new_connection() {
+        // get connection from client and decode it
+        // i give up, i will implement networking first, else this code will look terribly
     }
 
     std::vector<uint8_t> server_chr(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> Rc,  cry::RSAKey& rsa_pub) {
@@ -76,6 +82,31 @@ public:
         return verify_Rs;
     }
 
+    void handle_send(const std::string& pseudonym, msg::Send msg) {
+        auto conn = connections.find(msg.get_receiver());
+        msg::Recv recv{pseudonym, msg.get_text()};
+        if(conn == connections.end()) {
+            message_queue[msg.get_receiver()].push(recv);
+        }
+        else {
+            // send to user
+        }
+    }
+
+    void handle_error(msg::Message msg) {
+        std::cerr << "Got a message I cannot handle." << std::endl;
+    }
+
+    void handle_message(const std::string& pseudonym, std::vector<uint8_t> msg) {
+        std::unique_ptr<msg::Message> deserialized_msg = message_deserializer.deserialize(msg);
+        switch(msg::type(msg)) {
+            case msg::MessageType::Send:
+                handle_send(pseudonym, dynamic_cast<msg::Send&>(*deserialized_msg.get()));
+                break;
+            default:
+                handle_error(*deserialized_msg.get());
+        }
+    }
 };
 
 /**

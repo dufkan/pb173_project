@@ -49,4 +49,45 @@ TEST_CASE("Get active user vector") {
     REQUIRE(s.get_connected_users() == std::vector<std::string>{"alice", "bob", "eve"});
 }
 
+TEST_CASE("Handle Send") {
+    SECTION("with connected user") {
+        Server s;
+        s.connections["alice"];
+        s.handle_send("bob", msg::Send{"alice", std::vector<uint8_t>{0x60, 0x61, 0x62, 0x63}});
+        REQUIRE(s.message_queue["alice"].empty());
+    }
+    SECTION("without connected user") {
+        Server s;
+        s.handle_send("bob", msg::Send{"alice", std::vector<uint8_t>{0x60, 0x61, 0x62, 0x63}});
 
+        msg::Recv msg = s.message_queue["alice"].front();
+        s.message_queue["alice"].pop();
+
+        REQUIRE(msg.get_sender() == "bob");
+        REQUIRE(msg.get_text() == std::vector<uint8_t>{0x60, 0x61, 0x62, 0x63});
+        REQUIRE(s.message_queue["alice"].empty());
+    }
+    SECTION("multiple without connected user") {
+        Server s;
+        s.handle_send("bob", msg::Send{"alice", std::vector<uint8_t>{0x60, 0x61, 0x62, 0x63}});
+        s.handle_send("eve", msg::Send{"alice", std::vector<uint8_t>{0x66, 0x60}});
+        s.handle_send("bob", msg::Send{"alice", std::vector<uint8_t>{0x61, 0x61, 0x62, 0x63}});
+
+        msg::Recv msg = s.message_queue["alice"].front();
+        s.message_queue["alice"].pop();
+        REQUIRE(msg.get_sender() == "bob");
+        REQUIRE(msg.get_text() == std::vector<uint8_t>{0x60, 0x61, 0x62, 0x63});
+
+        msg = s.message_queue["alice"].front();
+        s.message_queue["alice"].pop();
+        REQUIRE(msg.get_sender() == "eve");
+        REQUIRE(msg.get_text() == std::vector<uint8_t>{0x66, 0x60});
+
+        msg = s.message_queue["alice"].front();
+        s.message_queue["alice"].pop();
+        REQUIRE(msg.get_sender() == "bob");
+        REQUIRE(msg.get_text() == std::vector<uint8_t>{0x61, 0x61, 0x62, 0x63});
+
+        REQUIRE(s.message_queue["alice"].empty());
+    }
+}
