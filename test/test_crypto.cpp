@@ -172,10 +172,8 @@ TEST_CASE("RSAKey") {
 }
 
 TEST_CASE("RSA import and export") {
-    cry::RSAKey k, l;
+    cry::RSAKey k, l, m;
     cry::generate_rsa_keys(k, k);
-
-    auto exported = k.export_all();
 
     REQUIRE(!l.has_pub());
     REQUIRE(!l.has_priv());
@@ -183,6 +181,7 @@ TEST_CASE("RSA import and export") {
     REQUIRE(!k.is_correct_priv(l));
     REQUIRE(!l.is_correct_priv(k));
 
+    auto exported = k.export_all();
     l.import(exported);
 
     REQUIRE(l.has_pub());
@@ -190,4 +189,13 @@ TEST_CASE("RSA import and export") {
 
     REQUIRE(k.is_correct_priv(l));
     REQUIRE(l.is_correct_priv(k));
+
+    exported = k.export_pub();
+    m.import(exported);
+
+    REQUIRE(m.has_pub());
+    REQUIRE(!m.has_priv());
+
+    REQUIRE(k.is_correct_priv(m));
+    REQUIRE(!m.is_correct_priv(k));
 }

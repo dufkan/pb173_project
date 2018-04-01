@@ -16,7 +16,7 @@ enum class MessageType : uint8_t {
     Login,
     Logout,
     Send,
-    Receive,
+    Recv,
     ReqPrekey,
     RetPrekey,
     AskPrekey,
@@ -91,7 +91,7 @@ public:
         message.put(name);
         message.put(static_cast<uint16_t>(key.size()));
         message.put(key);
-        return message.get();
+        return message.move();
     };
 
     /**
@@ -104,7 +104,7 @@ public:
     }
 
     bool operator== (const Register& a) const {
-        return ((name == a.name) && (key == a.key));
+        return name == a.name && key == a.key;
     }
 };
 
@@ -114,7 +114,7 @@ public:
  *
  */
 class Send : public Message {
-    std::string name;    
+    std::string receiver;
     std::vector<uint8_t> text;
 
 public:
@@ -126,8 +126,7 @@ public:
      * @param skey Symetric key shared with the server
      * @param text Text of message sending to reciever
      */
-    Send(std::string name, std::vector<uint8_t> text): name(name), text(text) {}
-    
+    Send(std::string receiver, std::vector<uint8_t> text): receiver(receiver), text(text) {}
 
     /**
      * Deserialize Send message from its binary representation
@@ -137,41 +136,96 @@ public:
      * @return Unique pointer to the deserialized
      */
     static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
-	Decoder message{data};
-	message.get_u8();
-	uint8_t namelen = message.get_u8();
-	std::string name = message.get_str(namelen);
-	uint16_t textlen = message.get_u16();
+        Decoder message{data};
+        message.get_u8();
+        uint8_t namelen = message.get_u8();
+        std::string name = message.get_str(namelen);
+        uint16_t textlen = message.get_u16();
         std::vector<uint8_t> text = message.get_vec(textlen);
-	return std::make_unique<Register>(name,text);
+        return std::make_unique<Send>(name, text);
     }
 
 
     std::vector<uint8_t> serialize() const override {
         Encoder message;
-	message.reserve(text.size() + name.size() + 1 + 2 + 1);
-	message.put(static_cast<uint8_t>(MessageType::Send));
-        message.put(static_cast<uint8_t>(name.size()));
-	message.put(name);
-	message.put(static_cast<uint16_t>(text.size()));
-	message.put(text);
-	return message.get();
+        message.reserve(text.size() + receiver.size() + 1 + 2 + 1);
+        message.put(static_cast<uint8_t>(MessageType::Send));
+        message.put(static_cast<uint8_t>(receiver.size()));
+        message.put(receiver);
+        message.put(static_cast<uint16_t>(text.size()));
+        message.put(text);
+        return message.move();
     }
 
-    std::string get_name() const {
-        return name;
+    std::string get_receiver() const {
+        return receiver;
+    }
+
+    const std::vector<uint8_t>& get_text() const {
+        return text;
     }
 
     bool operator==(const Send& s) const {
-        return ((name == s.name)&&(text == s.text));
+        return receiver == s.receiver && text == s.text;
     }
 };
 
 /**
  * Recieve message - from another user
- *
  */
-class Receive : public Message {};
+class Recv : public Message {
+    std::string sender;
+    std::vector<uint8_t> text;
+
+public:
+    /**
+     * Create new instance of Recieve message
+     *
+     * @param sender Pseudonym of the sender of the message
+     * @param text Text of message
+     */
+    Recv(std::string sender, std::vector<uint8_t> text): sender(sender), text(text) {}
+
+    /**
+     * Deserialize Recieve message from its binary representation
+     *
+     * @param data Binary representation of Receive message (without the first byte AKA type byte)
+     * @return Unique pointer to the object
+     */
+    static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
+        Decoder message{data};
+        message.get_u8();
+        uint8_t namelen = message.get_u8();
+        std::string name = message.get_str(namelen);
+        uint16_t textlen = message.get_u16();
+        std::vector<uint8_t> text = message.get_vec(textlen);
+        return std::make_unique<Recv>(name, text);
+    }
+
+
+    std::vector<uint8_t> serialize() const override {
+        Encoder message;
+        message.reserve(text.size() + sender.size() + 1 + 2 + 1);
+        message.put(static_cast<uint8_t>(MessageType::Recv));
+        message.put(static_cast<uint8_t>(sender.size()));
+        message.put(sender);
+        message.put(static_cast<uint16_t>(text.size()));
+        message.put(text);
+        return message.move();
+    }
+
+    std::string get_sender() const {
+        return sender;
+    }
+
+    const std::vector<uint8_t>& get_text() const {
+        return text;
+    }
+
+    bool operator==(const Recv& s) const {
+        return sender == s.sender && text == s.text;
+    }
+};
 class Login : public Message {};
 class Logout : public Message {};
 class ReqPrekey : public Message {};
@@ -189,6 +243,8 @@ public:
     MessageDeserializer() {
         // create mapping between message types and deserialize function pointer
         deserialize_map.insert({MessageType::Register, &Register::deserialize});
+        deserialize_map.insert({MessageType::Send, &Send::deserialize});
+        deserialize_map.insert({MessageType::Recv, &Recv::deserialize});
     }
 
     /**
