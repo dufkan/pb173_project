@@ -15,8 +15,6 @@ class Client {
 #ifdef TESTMODE
 public:
 #endif
-    Channel chan;
-
     std::vector<uint8_t> client_challenge(std::array<uint8_t, 32> Rc, cry::RSAKey& rsa_pub, std::string pseudo, std::vector<uint8_t> key) {
         Encoder e;
         std::vector<uint8_t> eRc = cry::encrypt_rsa(Rc, rsa_pub);
@@ -67,10 +65,10 @@ public:
      *
      * @return message Send
      */
-    msg::Send create_message(std::string recv_name, std::array<uint8_t,32> recv_key, std::vector<uint8_t> text) { 
-	std::vector text_enc = encrypt_aes(text, {}, recv_key);
+    msg::Send create_message(std::string recv_name, std::array<uint8_t, 32> recv_key, std::vector<uint8_t> text) {
+        std::vector text_enc = cry::encrypt_aes(text, {}, recv_key);
         msg::Send msg_send(recv_name,text_enc);
-	return msg_send.move();
+        return msg_send;
     }
 
 
@@ -85,7 +83,8 @@ public:
         tcp::resolver resolver{io_service};
         asio::connect(sock, resolver.resolve({"127.0.0.1", "1337"}));
 
-        Channel chan = initiate_connection(sock);
+        Channel chan{std::move(sock)};
+        initiate_connection(chan);
 
         //char request[1024] = "Hello there!";
         //asio::write(sock, asio::buffer(request, 12));
@@ -97,7 +96,7 @@ public:
     /**
      * Initiate a connection to server
      */
-    Channel initiate_connection(asio::ip::tcp::socket& sock) {
+    void initiate_connection(Channel& chan) {
         std::vector<uint8_t> file_key = util::read_file("PUBSECRET");
         cry::RSAKey spub;
         spub.import(file_key);
@@ -116,8 +115,6 @@ public:
         auto msg = e.move();
         asio::write(sock, asio::buffer(msg.data(), msg.size()));
         */
-
-        return {};
     }
 };
 

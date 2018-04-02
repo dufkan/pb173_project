@@ -42,17 +42,21 @@ TEST_CASE("Get user key") {
 }
 
 TEST_CASE("Get active user vector") {
+    asio::io_service io_service;
+    asio::ip::tcp::socket sock{io_service};
     Server s;
-    s.connections.insert(std::make_pair(std::string{"eve"}, Channel{}));
-    s.connections.insert(std::make_pair(std::string{"alice"}, Channel{}));
-    s.connections.insert(std::make_pair(std::string{"bob"}, Channel{}));
+    s.connections.insert(std::make_pair(std::string{"eve"}, Channel{std::move(sock)}));
+    s.connections.insert(std::make_pair(std::string{"alice"}, Channel{std::move(sock)}));
+    s.connections.insert(std::make_pair(std::string{"bob"}, Channel{std::move(sock)}));
     REQUIRE(s.get_connected_users() == std::vector<std::string>{"alice", "bob", "eve"});
 }
 
 TEST_CASE("Handle Send") {
     SECTION("with connected user") {
+        asio::io_service io_service;
+        asio::ip::tcp::socket sock{io_service};
         Server s;
-        s.connections["alice"];
+        s.connections.emplace("alice", Channel{std::move(sock)});
         s.handle_send("bob", msg::Send{"alice", std::vector<uint8_t>{0x60, 0x61, 0x62, 0x63}});
         REQUIRE(s.message_queue["alice"].empty());
     }

@@ -11,7 +11,7 @@
 #include <utility>
 #include <queue>
 
-//#include "asio.hpp"
+#include "asio.hpp"
 #include "../shared/messages.hpp"
 #include "../shared/crypto.hpp"
 #include "../shared/channel.hpp"
