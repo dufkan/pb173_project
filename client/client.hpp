@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <iostream>
 
 #include "asio.hpp"
 #include "../shared/messages.hpp"
@@ -71,9 +72,6 @@ public:
         return msg_send;
     }
 
-
-
-
 public:
     void run() {
         using asio::ip::tcp;
@@ -85,12 +83,6 @@ public:
 
         Channel chan{std::move(sock)};
         initiate_connection(chan);
-
-        //char request[1024] = "Hello there!";
-        //asio::write(sock, asio::buffer(request, 12));
-
-        //char reply[1024];
-        //size_t reply_length = asio::read(sock, asio::buffer(reply, 3));
     }
 
     /**
@@ -107,14 +99,23 @@ public:
         cry::RSAKey ckey;
         cry::generate_rsa_keys(ckey, ckey);
 
-        /*
         std::vector<uint8_t> chall = client_challenge(Rc, spub, "alice", ckey.export_pub());
+        chan.send(chall);
+
+        auto [Rs, verify_Rc] = decode_server_chr(chan.recv(), ckey);
+
+        if(verify_Rc != Rc) {
+            std::cerr << "There is a BIG problem!" << std::endl;
+            return; // TODO handle with exception
+        }
+
         Encoder e;
-        e.put(static_cast<uint16_t>(chall.size()));
-        e.put(chall);
-        auto msg = e.move();
-        asio::write(sock, asio::buffer(msg.data(), msg.size()));
-        */
+        e.put(Rs);
+        e.put(Rc);
+        std::array<uint8_t, 32> K = cry::hash_sha(e.move());
+
+        chan.send(client_response(K, Rs));
+        std::cout << "I am in!" << std::endl;
     }
 };
 

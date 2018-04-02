@@ -25,7 +25,7 @@ public:
     std::map<std::string, Channel> connections;
     std::map<std::string, std::queue<msg::Recv>> message_queue;
     msg::MessageDeserializer message_deserializer;
-    cry::RSAKey key;
+    cry::RSAKey server_key;
 
 public:
     Server() {
@@ -40,7 +40,32 @@ public:
         tcp::socket sock{io_service};
         acc.accept(sock);
 
-        // Channel
+        Channel chan{std::move(sock)};
+
+        auto [Rc, pseudonym, client_key] = decode_client_challenge(chan.recv(), server_key);
+
+        cry::RSAKey ck;
+        ck.import(client_key);
+
+        std::array<uint8_t, 32> Rs;
+        cry::random_data(Rs);
+
+        chan.send(server_chr(Rs, Rc, ck));
+
+        Encoder e;
+        e.put(Rs);
+        e.put(Rc);
+        auto K = cry::hash_sha(e.move());
+
+        std::array<uint8_t, 32> verify_Rs = decode_client_response(chan.recv(), K);
+
+        if(verify_Rs != Rs) {
+            std::cerr << "We got a BIG problem!" << std::endl;
+            return; // TODO exception
+        }
+
+        connections.emplace(pseudonym, std::move(chan));
+        std::cout << pseudonym << " registered & logged successfully." << std::endl;
     }
 
     std::vector<std::string> get_connected_users() {
@@ -127,12 +152,12 @@ public:
     void prepare_key() {
         try {
             std::vector<uint8_t> file_key = util::read_file("TOPSECRET");
-            key.import(file_key);
+            server_key.import(file_key);
         }
         catch(const std::ios_base::failure& e) {
-            cry::generate_rsa_keys(key, key);
-            util::write_file("TOPSECRET", key.export_all());
-            util::write_file("PUBSECRET", key.export_pub());
+            cry::generate_rsa_keys(server_key, server_key);
+            util::write_file("TOPSECRET", server_key.export_all());
+            util::write_file("PUBSECRET", server_key.export_pub());
         }
     }
 };
