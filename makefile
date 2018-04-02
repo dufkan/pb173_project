@@ -23,7 +23,7 @@ smain: server/main.cpp server/server.hpp
 	$(CXX) $(CXXOPTS) -o $@ $< $(LINK)
 
 tests: test/test.cpp test/test_crypto.cpp test/test_server.cpp test/test_messages.cpp test/test_channel.cpp
-	$(CXX) -DTESTMODE $(CXXOPTS) -o $@ $< $(LINK)
+	$(CXX) -DTESTMODE $(CXXOPTS) -g -o $@ $< $(LINK)
 
 mbedtls-clean:
 	cd libs/mbedtls && $(MAKE) clean

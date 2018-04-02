@@ -62,7 +62,7 @@ class Decoder {
 #ifdef TESTMODE
 public:
 #endif
-    std::vector<uint8_t> data;
+    std::vector<uint8_t> data; // TODO swap for cyclic buffer or some better data structure
     size_t i = 0;
 
     void check_read(size_t len) {
@@ -71,8 +71,21 @@ public:
     }
 
 public:
-
+    Decoder() = default;
     Decoder(std::vector<uint8_t> data): data(data) {}
+
+    void append(const std::vector<uint8_t>& new_data) {
+        data.insert(std::end(data), std::begin(new_data), std::end(new_data));
+    }
+
+    void append(const uint8_t* new_data, size_t len) {
+        data.insert(std::end(data), new_data, new_data + len);
+    }
+
+    void cut() {
+        data.erase(std::begin(data), std::begin(data) + i);
+        i = 0;
+    }
 
     uint8_t get_u8() {
         check_read(1);
@@ -117,6 +130,10 @@ public:
         check_read(len);
         i += len;
         return std::string{reinterpret_cast<const char*>(data.data() + (i - len)), len};
+    }
+
+    size_t size() {
+        return data.size() - i;
     }
 };
 
