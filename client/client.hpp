@@ -57,6 +57,24 @@ public:
         return {Rs, verify_Rc};
     }
 
+    /**
+     * Create message Send from params and encrypt the text with AES-256 recv_key
+     *
+     * @param recv_name Pseudonym of reciever of the message
+     * @param recv_key Symetric key for AES shared with reciever of the message
+     * @param text Text of the message
+     *
+     * @return message Send
+     */
+    msg::Send create_message(std::string recv_name, std::array<uint8_t,32> recv_key, std::vector<uint8_t> text) { 
+	std::vector text_enc = encrypt_aes(text, {}, recv_key);
+        msg::Send msg_send(recv_name,text_enc);
+	return msg_send.move();
+    }
+
+
+
+
 public:
     /**
      * Initiate a connection to server
