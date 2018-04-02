@@ -1,7 +1,9 @@
 #include "client.hpp"
+#include "asio.hpp"
+#include <iostream>
 
 int main() {
     Client c;
-    c.initiate_connection();
+    c.run();
     return 0;
 }

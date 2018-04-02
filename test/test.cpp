@@ -7,6 +7,7 @@
 #include "test_crypto.cpp"
 #include "test_server.cpp"
 #include "test_messages.cpp"
+#include "test_channel.cpp"
 
 TEST_CASE("Challenge-Response") {
     Client c;

@@ -9,6 +9,7 @@
 #include "../shared/channel.hpp"
 #include "../shared/crypto.hpp"
 #include "../shared/codec.hpp"
+#include "../shared/util.hpp"
 
 class Client {
 #ifdef TESTMODE
@@ -58,22 +59,47 @@ public:
     }
 
 public:
+    void run() {
+        using asio::ip::tcp;
+        asio::io_service io_service;
+
+        tcp::socket sock{io_service};
+        tcp::resolver resolver{io_service};
+        asio::connect(sock, resolver.resolve({"127.0.0.1", "1337"}));
+
+        Channel chan = initiate_connection(sock);
+
+        //char request[1024] = "Hello there!";
+        //asio::write(sock, asio::buffer(request, 12));
+
+        //char reply[1024];
+        //size_t reply_length = asio::read(sock, asio::buffer(reply, 3));
+    }
+
     /**
      * Initiate a connection to server
      */
-    void initiate_connection() {
-        // generate Rc
-        // encrypt Rc using pub_key_server
-        // encrypt pseudonym and possibly pubkey using Rc
-        // compute HMAC
-        // form message
-        // send message
-        // recieve response
-        // decrypt Rs using privkey
-        // decrypt Rc using Rs and verify it
-        // compute K = sha(Rs || Rc)
-        // encrypt Rs using K and send it to server
-        // initialize Channel with key K
+    Channel initiate_connection(asio::ip::tcp::socket& sock) {
+        std::vector<uint8_t> file_key = util::read_file("PUBSECRET");
+        cry::RSAKey spub;
+        spub.import(file_key);
+
+        std::array<uint8_t, 32> Rc;
+        cry::random_data(Rc);
+
+        cry::RSAKey ckey;
+        cry::generate_rsa_keys(ckey, ckey);
+
+        /*
+        std::vector<uint8_t> chall = client_challenge(Rc, spub, "alice", ckey.export_pub());
+        Encoder e;
+        e.put(static_cast<uint16_t>(chall.size()));
+        e.put(chall);
+        auto msg = e.move();
+        asio::write(sock, asio::buffer(msg.data(), msg.size()));
+        */
+
+        return {};
     }
 };
 

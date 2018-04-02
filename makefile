@@ -16,14 +16,14 @@ test: tests
 	chmod -w nowrite
 	./tests
 
-cmain: client/main.cpp
-	$(CXX) $(CXXOPTS) -o $@ $^ $(LINK)
+cmain: client/main.cpp client/client.hpp
+	$(CXX) $(CXXOPTS) -o $@ $< $(LINK)
 
-smain: server/main.cpp
-	$(CXX) $(CXXOPTS) -o $@ $^ $(LINK)
+smain: server/main.cpp server/server.hpp
+	$(CXX) $(CXXOPTS) -o $@ $< $(LINK)
 
-tests: test/test.cpp test/test_crypto.cpp test/test_server.cpp test/test_messages.cpp
-	$(CXX) -DTESTMODE $(CXXOPTS) -o $@ test/test.cpp $(LINK)
+tests: test/test.cpp test/test_crypto.cpp test/test_server.cpp test/test_messages.cpp test/test_channel.cpp
+	$(CXX) -DTESTMODE $(CXXOPTS) -o $@ $< $(LINK)
 
 mbedtls-clean:
 	cd libs/mbedtls && $(MAKE) clean

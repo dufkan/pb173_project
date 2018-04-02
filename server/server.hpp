@@ -25,8 +25,24 @@ public:
     std::map<std::string, Channel> connections;
     std::map<std::string, std::queue<msg::Recv>> message_queue;
     msg::MessageDeserializer message_deserializer;
+    cry::RSAKey key;
 
 public:
+    Server() {
+        prepare_key();
+    }
+
+    void run() {
+        using asio::ip::tcp;
+        asio::io_service io_service;
+
+        tcp::acceptor acc{io_service, tcp::endpoint(tcp::v4(), 1337)};
+        tcp::socket sock{io_service};
+        acc.accept(sock);
+
+        // Channel
+    }
+
     std::vector<std::string> get_connected_users() {
         std::vector<std::string> connected;
         connected.reserve(connections.size());
@@ -105,6 +121,18 @@ public:
                 break;
             default:
                 handle_error(*deserialized_msg.get());
+        }
+    }
+
+    void prepare_key() {
+        try {
+            std::vector<uint8_t> file_key = util::read_file("TOPSECRET");
+            key.import(file_key);
+        }
+        catch(const std::ios_base::failure& e) {
+            cry::generate_rsa_keys(key, key);
+            util::write_file("TOPSECRET", key.export_all());
+            util::write_file("PUBSECRET", key.export_pub());
         }
     }
 };
