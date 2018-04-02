@@ -16,6 +16,8 @@ class Client {
 public:
 #endif
     Channel chan;
+    std::map<std::string, std::array<uint8_t,32>> contacts;
+
 
     std::vector<uint8_t> client_challenge(std::array<uint8_t, 32> Rc, cry::RSAKey& rsa_pub, std::string pseudo, std::vector<uint8_t> key) {
         Encoder e;
@@ -73,8 +75,28 @@ public:
 	return msg_send.move();
     }
 
+    
 
+/**
+     * Create message Send from params and encrypt the text with AES-256 recv_key
+     *
+     * @param recv_name Pseudonym of reciever of the message
+     * @param recv_key Symetric key for AES shared with reciever of the message
+     * @param text Text of the message
+     *
+     * @return message Send
+     */
+    msg::Send create_message(std::string recv_name, std::vector<uint8_t> text) {
+	auto it = contacts.find(recv_name);
+	if (it == contacts.end()) {
+	    /* Send a message to server fot recv keys and prekeys.... */
 
+	}
+	std::array<uint8_t,32> recv_key = it->second;
+	std::vector text_enc = encrypt_aes(text, {}, recv_key);
+        msg::Send msg_send(recv_name,text_enc);
+        return msg_send.move();
+    }
 
 public:
     void run() {
