@@ -64,6 +64,7 @@ public:
             return; // TODO exception
         }
 
+        chan.set_key(K);
         connections.emplace(pseudonym, std::move(chan));
         std::cout << pseudonym << " registered & logged successfully." << std::endl;
     }
