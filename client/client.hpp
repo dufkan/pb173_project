@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <iostream>
 
 #include "asio.hpp"
 #include "../shared/messages.hpp"
@@ -17,7 +18,6 @@ public:
 #endif
     Channel chan;
     std::map<std::string, std::array<uint8_t,32>> contacts;
-
 
     std::vector<uint8_t> client_challenge(std::array<uint8_t, 32> Rc, cry::RSAKey& rsa_pub, std::string pseudo, std::vector<uint8_t> key) {
         Encoder e;
@@ -69,23 +69,6 @@ public:
      *
      * @return message Send
      */
-    msg::Send create_message(std::string recv_name, std::array<uint8_t,32> recv_key, std::vector<uint8_t> text) { 
-	std::vector text_enc = encrypt_aes(text, {}, recv_key);
-        msg::Send msg_send(recv_name,text_enc);
-	return msg_send.move();
-    }
-
-    
-
-/**
-     * Create message Send from params and encrypt the text with AES-256 recv_key
-     *
-     * @param recv_name Pseudonym of reciever of the message
-     * @param recv_key Symetric key for AES shared with reciever of the message
-     * @param text Text of the message
-     *
-     * @return message Send
-     */
     msg::Send create_message(std::string recv_name, std::vector<uint8_t> text) {
 	auto it = contacts.find(recv_name);
 	if (it == contacts.end()) {
@@ -98,6 +81,7 @@ public:
         return msg_send.move();
     }
 
+
 public:
     void run() {
         using asio::ip::tcp;
@@ -107,19 +91,14 @@ public:
         tcp::resolver resolver{io_service};
         asio::connect(sock, resolver.resolve({"127.0.0.1", "1337"}));
 
-        Channel chan = initiate_connection(sock);
-
-        //char request[1024] = "Hello there!";
-        //asio::write(sock, asio::buffer(request, 12));
-
-        //char reply[1024];
-        //size_t reply_length = asio::read(sock, asio::buffer(reply, 3));
+        Channel chan{std::move(sock)};
+        initiate_connection(chan);
     }
 
     /**
      * Initiate a connection to server
      */
-    Channel initiate_connection(asio::ip::tcp::socket& sock) {
+    void initiate_connection(Channel& chan) {
         std::vector<uint8_t> file_key = util::read_file("PUBSECRET");
         cry::RSAKey spub;
         spub.import(file_key);
@@ -130,16 +109,23 @@ public:
         cry::RSAKey ckey;
         cry::generate_rsa_keys(ckey, ckey);
 
-        /*
         std::vector<uint8_t> chall = client_challenge(Rc, spub, "alice", ckey.export_pub());
-        Encoder e;
-        e.put(static_cast<uint16_t>(chall.size()));
-        e.put(chall);
-        auto msg = e.move();
-        asio::write(sock, asio::buffer(msg.data(), msg.size()));
-        */
+        chan.send(chall);
 
-        return {};
+        auto [Rs, verify_Rc] = decode_server_chr(chan.recv(), ckey);
+
+        if(verify_Rc != Rc) {
+            std::cerr << "There is a BIG problem!" << std::endl;
+            return; // TODO handle with exception
+        }
+
+        Encoder e;
+        e.put(Rs);
+        e.put(Rc);
+        std::array<uint8_t, 32> K = cry::hash_sha(e.move());
+
+        chan.send(client_response(K, Rs));
+        std::cout << "I am in!" << std::endl;
     }
 };
 
