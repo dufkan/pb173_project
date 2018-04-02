@@ -1,14 +1,14 @@
 #ifndef CHANNEL_HPP
 #define CHANNEL_HPP
-#include "messages.hpp"
 #include "asio.hpp"
+#include "crypto.hpp"
 
 class Channel {
 #ifdef TESTMODE
 public:
 #endif
     asio::ip::tcp::socket sock;
-    std::array<uint8_t, 32> key;
+    std::optional<std::array<uint8_t, 32>> key; // TODO replace with universal enc/dec module
     Decoder decoder;
     uint16_t msglen = 0;
 
@@ -31,12 +31,19 @@ public:
 public:
     Channel(asio::ip::tcp::socket&& sock): sock(std::move(sock)) {}
 
-    void send(const std::vector<uint8_t> msg) {
+    void send(const std::vector<uint8_t>& msg) {
+        std::vector<uint8_t> emsg;
+        if (key)
+            emsg = cry::encrypt_aes(msg, {}, *key);
+        else
+            emsg = msg;
+
         Encoder e;
-        e.put(static_cast<uint16_t>(msg.size()));
+        e.put(static_cast<uint16_t>(emsg.size()));
         std::vector<uint8_t> header = e.move();
+
         asio::write(sock, asio::buffer(header));
-        asio::write(sock, asio::buffer(msg));
+        asio::write(sock, asio::buffer(emsg));
     }
 
     std::vector<uint8_t> recv() {
@@ -48,6 +55,9 @@ public:
         auto msg = decoder.get_vec(msglen);
         msglen = 0;
         decoder.cut();
+
+        if(key)
+            return cry::decrypt_aes(msg, {}, *key);
         return msg;
     }
 
@@ -60,6 +70,10 @@ public:
         if(msglen != 0 && decoder.size() + sock.available() >= msglen)
             return recv();
         return {};
+    }
+
+    void set_key(const std::array<uint8_t, 32>& val) {
+        key = val;
     }
 };
 

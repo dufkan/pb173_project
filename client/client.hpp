@@ -115,6 +115,8 @@ public:
         std::array<uint8_t, 32> K = cry::hash_sha(e.move());
 
         chan.send(client_response(K, Rs));
+
+        chan.set_key(K);
         std::cout << "I am in!" << std::endl;
     }
 };
