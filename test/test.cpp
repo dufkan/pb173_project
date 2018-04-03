@@ -8,6 +8,7 @@
 #include "test_server.cpp"
 #include "test_messages.cpp"
 #include "test_channel.cpp"
+#include "test_client.cpp"
 
 TEST_CASE("Challenge-Response") {
     Client c;
