@@ -18,8 +18,9 @@ class Client {
 public:
 #endif
     std::map<std::string, std::array<uint8_t,32>> contacts;
+    std::string pseudonym = "noone";
 
-     
+
 
     std::vector<uint8_t> client_challenge(std::array<uint8_t, 32> Rc, cry::RSAKey& rsa_pub, std::string pseudo, std::vector<uint8_t> key) {
         Encoder e;
@@ -133,7 +134,8 @@ public:
     }
 
 public:
-
+    Client() = default;
+    Client(std::string pseudonym): pseudonym(std::move(pseudonym)) {}
 
     bool add_contact(std::string name, std::array<uint8_t,32> key) {
         auto it = contacts.find(name);
@@ -175,7 +177,7 @@ public:
         cry::RSAKey ckey;
         cry::generate_rsa_keys(ckey, ckey);
 
-        std::vector<uint8_t> chall = client_challenge(Rc, spub, "alice", ckey.export_pub());
+        std::vector<uint8_t> chall = client_challenge(Rc, spub, pseudonym, ckey.export_pub());
         chan.send(chall);
 
         auto [Rs, verify_Rc] = decode_server_chr(chan.recv(), ckey);
@@ -196,96 +198,4 @@ public:
         std::cout << "I am in!" << std::endl;
     }
 };
-
-/**
- * Create message - for choosed pseudonym write the text of message.
- * 
- * @param pseudonym - pseudonym of the reciever
- */
-//msg::Message write_message(std::string pseudonym);
-
-/**
- * Receives a message from connection.
- *
- * @param conn - connection to recieve message from
- */
-//std::vector<uint8_t> recv_message(/* asio::tcp::connection& conn */);
-
-
-/**
- * Sends a message to connection.
- *
- * @param conn - connection to send to
- */
-//void send_message(/* asio::tcp::connection& conn */, msg::Message& message);
-
-
-
-/**
- * Add new user to database my_friends.
- *
- * @param pseudonym - pseudonym of the user
- * @param pubkey - public key of the user
- */
-//void add_friend(std::string psuedonym, std::vector<uint_8> pubkey);
-
-
-/**
- * Get a user public key from database my_frinds. 
- *
- * @param pseudonym - pseudonym of the user
- */
-//std::vector<uint_8> get_friend_pubkey(std::string pseudonym);
-
-
-/**
- * Generate new pair of public and private key.
- *
- * @param prikey - the new private key will be saved here
- * @param pubkey - the new public key will be saved here
- */
-//void generate_keys(std::vector<uint_8> prikey, std::vector<uint_8> pubkey);
-
-
-/**
- * Ask server for public key of the user
- * 
- * @param pseudonym - pseudonym of the user
- * @return user public key
- */
-//std::vector<uint_8> ask_user_pubkey(std::string pseudonym);
-
-/**
- * Create challenge message for challenge-response protocol with server.
- *
- * @param pubkey - public key to use for challenge encryption
- */
-//msg::Challenge create_challenge(std::vector<uint8_t> pubkey);
-
-
-/**
- * Create response message for challenge-response protocol with server.
- *
- * @param challenge Received challenge
- * @param pubkey Public key of the response recipient
- */
-//msg::Response create_response(std::vector<uint8_t> challenge, std::vector<uint8_t> pubkey);
-
-
-/**
- * Get key from the challenge response messeges.
- *
- * @param chall - data from challenge
- * @param resp - data from response
- * @return symetric key created from chall and resp
- */ 
-//std::vector<uint_8> chr_create_key(std::vector<uint_8> chall, std::vector<uint_8> resp);
-
-
-/**
- * Close connection.
- *
- * @param conn - connection which should be closed
- */
-//void close_connection(/*asio::tcp::connection& conn*/);
 #endif
