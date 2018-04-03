@@ -94,8 +94,7 @@ public:
         }
         std::array<uint8_t,32> recv_key = it->second; 	
 	msg::Send msg_send = create_message(recv_name, recv_key, text_u);
-	std::vector<uint8_t> byte_to_send = msg_send.serialize();
-	chan.send(byte_to_send);
+	chan.send(msg_send.serialize());
     }
     
     
@@ -113,8 +112,7 @@ public:
             /* Some error or resolution of it */
 
         }
-        std::array<uint8_t,32> sender_key = it->second;
-	std::vector<uint8_t> text_dec = cry::decrypt_aes(msg_recv.get_text(),{},sender_key);
+	std::vector<uint8_t> text_dec = cry::decrypt_aes(msg_recv.get_text(),{},it->second);
 	return std::make_pair(sender_name,text_dec);
     }
 

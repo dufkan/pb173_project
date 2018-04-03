@@ -102,6 +102,12 @@ public:
     std::string get_name() const {
         return name;
     }
+    
+    
+    std::vector<uint8_t> get_key() const {
+	return key;
+    }
+
 
     bool operator== (const Register& a) const {
         return name == a.name && key == a.key;
