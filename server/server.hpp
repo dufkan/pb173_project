@@ -10,6 +10,10 @@
 #include <cstdio>
 #include <utility>
 #include <queue>
+#include <thread>
+#include <chrono>
+#include <mutex>
+#include <iterator>
 
 #include "asio.hpp"
 #include "../shared/messages.hpp"
@@ -23,50 +27,90 @@ class Server {
 public:
 #endif
     std::map<std::string, Channel> connections;
+
+    std::mutex connection_queue_mutex;
+    std::deque<std::pair<std::string, Channel>> connection_queue;
+
+
     std::map<std::string, std::queue<msg::Recv>> message_queue;
-    msg::MessageDeserializer message_deserializer;
+
     cry::RSAKey server_key;
+
+    msg::MessageDeserializer message_deserializer;
+    asio::io_service io_service;
 
 public:
     Server() {
         prepare_key();
     }
 
-    void run() {
+    /**
+     * Handling of an incomming connection ~ Authentication,
+     * key agreement, creation of channel.
+     */
+    void connection_handler() {
         using asio::ip::tcp;
-        asio::io_service io_service;
-
         tcp::acceptor acc{io_service, tcp::endpoint(tcp::v4(), 1337)};
-        tcp::socket sock{io_service};
-        acc.accept(sock);
+        for(;;) {
+            tcp::socket sock{io_service};
+            acc.accept(sock);
 
-        Channel chan{std::move(sock)};
+            Channel chan{std::move(sock)};
 
-        auto [Rc, pseudonym, client_key] = decode_client_challenge(chan.recv(), server_key);
+            auto [Rc, pseudonym, client_key] = decode_client_challenge(chan.recv(), server_key);
 
-        cry::RSAKey ck;
-        ck.import(client_key);
+            cry::RSAKey ck;
+            ck.import(client_key);
 
-        std::array<uint8_t, 32> Rs;
-        cry::random_data(Rs);
+            std::array<uint8_t, 32> Rs;
+            cry::random_data(Rs);
 
-        chan.send(server_chr(Rs, Rc, ck));
+            chan.send(server_chr(Rs, Rc, ck));
 
-        Encoder e;
-        e.put(Rs);
-        e.put(Rc);
-        auto K = cry::hash_sha(e.move());
+            Encoder e;
+            e.put(Rs);
+            e.put(Rc);
+            auto K = cry::hash_sha(e.move());
 
-        std::array<uint8_t, 32> verify_Rs = decode_client_response(chan.recv(), K);
+            std::array<uint8_t, 32> verify_Rs = decode_client_response(chan.recv(), K);
 
-        if(verify_Rs != Rs) {
-            std::cerr << "We got a BIG problem!" << std::endl;
-            return; // TODO exception
+            if(verify_Rs != Rs) {
+                std::cerr << "We got a BIG problem!" << std::endl;
+                continue; // TODO exception
+            }
+
+            chan.set_key(K);
+            {
+                std::unique_lock lock{connection_queue_mutex};
+                connection_queue.emplace_front(std::pair{pseudonym, std::move(chan)});
+            }
+            std::cout << pseudonym << " added to connection queue." << std::endl;
         }
+    }
 
-        chan.set_key(K);
-        connections.emplace(pseudonym, std::move(chan));
-        std::cout << pseudonym << " registered & logged successfully." << std::endl;
+    void sync_connections() {
+        std::unique_lock lock{connection_queue_mutex, std::try_to_lock};
+        if(!lock.owns_lock())
+            return;
+        connections.insert(std::move_iterator(connection_queue.begin()), std::move_iterator(connection_queue.end()));
+        while(!connection_queue.empty()) {
+            connection_queue.pop_front();
+        }
+    }
+
+    void run() {
+        auto t = std::thread(&Server::connection_handler, this);
+        for(;;) {
+            sync_connections();
+            for(auto& c : connections) {
+                auto msg = c.second.try_recv();
+                if(!msg.empty()) {
+                    std::cout << "handling message from " << c.first << std::endl;
+                    handle_message(c.first, msg);
+                }
+            }
+        }
+        t.join();
     }
 
     std::vector<std::string> get_connected_users() {
@@ -76,15 +120,6 @@ public:
             connected.push_back(c.first);
         }
         return connected;
-    }
-
-    /**
-     * Handling of an incomming connection ~ Authentication,
-     * key agreement, creation of channel.
-     */
-    void handle_new_connection() {
-        // get connection from client and decode it
-        // i give up, i will implement networking first, else this code will look terribly
     }
 
     std::vector<uint8_t> server_chr(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> Rc,  cry::RSAKey& rsa_pub) {
