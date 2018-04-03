@@ -108,6 +108,7 @@ public:
                     std::cout << "handling message from " << c.first << std::endl;
                     handle_message(c.first, msg);
                 }
+                // TODO handle disconnects
             }
         }
         t.join();
@@ -166,7 +167,7 @@ public:
             message_queue[msg.get_receiver()].push(recv);
         }
         else {
-            // send to user
+            // TODO send to user
         }
     }
 
@@ -197,38 +198,6 @@ public:
         }
     }
 };
-
-/**
- * Starts server ~ listening on TCP ip:port.
- *
- * @param ip IP address of the server
- * @param port TCP port of the server
- */
-//void server(/* ip */, /* port */);
-
-/**
- * Accepts a connection from acceptor
- *
- * @param acceptor Acceptor object listening to connections.
- */
-//void accept_connection(/* asio::tcp::acceptor& acceptor */);
-
-/**
- * Receives a message from connection.
- *
- * @param conn Connection to recieve message from
- *
- * @return Vector of bytes of received message
- */
-//std::vector<uint8_t> recv_message(/* asio::tcp::connection& conn */);
-
-/**
- * Sends a message to connection.
- *
- * @param conn Connection to send to
- */
-//void send_message(/* asio::tcp::connection& conn */, msg::Message& message);
-
 
 /**
  * Add new user to database.
