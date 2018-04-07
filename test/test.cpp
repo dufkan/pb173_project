@@ -43,8 +43,12 @@ TEST_CASE("Challenge-Response") {
     std::array<uint8_t, 32> Rs;
     cry::random_data(Rs);
 
-    auto server_challenge = s.server_chr(Rs, server_Rc, CLIENT_KEY);
-    auto [client_Rs, verify_Rc] = c.decode_server_chr(server_challenge, CLIENT_KEY);
+    auto sresp = msg::ServerResp{Rs, Rc};
+    sresp.encrypt(CLIENT_KEY);
+    auto uniq_sresp = md.deserialize(sresp.serialize());
+    auto real_sresp = dynamic_cast<msg::ServerResp&>(*uniq_sresp.get());
+    real_sresp.decrypt(CLIENT_KEY);
+    auto [client_Rs, verify_Rc] = real_sresp.get();
 
     REQUIRE(Rs == client_Rs); // Rs transfer successful
     REQUIRE(verify_Rc == Rc); // server authenticated

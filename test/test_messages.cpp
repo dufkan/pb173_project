@@ -33,6 +33,32 @@ TEST_CASE("Message ClientInit") {
     CHECK(original == restored);
 }
 
+TEST_CASE("Message ServerResp") {
+    std::array<uint8_t, 32> Rc;
+    cry::random_data(Rc);
+    std::array<uint8_t, 32> Rs;
+    cry::random_data(Rs);
+
+    auto original = msg::ServerResp{Rs, Rc};
+
+    CHECK(original.Rs == Rs);
+    CHECK(original.Rc == Rc);
+
+    original.encrypt(CLIENT_KEY);
+
+    std::vector<uint8_t> serialized = original.serialize();
+    CHECK(msg::type(serialized) == msg::MessageType::ServerResp);
+
+    std::unique_ptr<msg::Message> deserialized = msg::ServerResp::deserialize(serialized);
+    msg::ServerResp& restored = dynamic_cast<msg::ServerResp&>(*deserialized.get());
+
+    restored.decrypt(CLIENT_KEY);
+    CHECK(restored.Rs == Rs);
+    CHECK(restored.Rc == Rc);
+
+    CHECK(original == restored);
+}
+
 
 TEST_CASE("Message Send", "(de)serialize") {
     std::string name = "some pseudonym";

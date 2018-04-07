@@ -113,6 +113,62 @@ public:
     }
 };
 
+class ServerResp : public Message {
+#ifdef TESTMODE
+public:
+#endif
+    std::array<uint8_t, 32> Rs;
+    std::array<uint8_t, 32> Rc;
+
+    std::vector<uint8_t> eRs;
+    std::vector<uint8_t> eRc;
+
+
+    ServerResp(std::vector<uint8_t> eRs, std::vector<uint8_t> eRc):
+        eRs(std::move(eRs)), eRc(std::move(eRc)) {}
+public:
+    ServerResp(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> Rc):
+        Rs(std::move(Rs)), Rc(std::move(Rc)) {}
+
+    void encrypt(cry::RSAKey& client_pub) {
+        eRs = cry::encrypt_rsa(Rs, client_pub);
+        eRc = cry::encrypt_aes(Rc, {}, Rs);
+    }
+
+    void decrypt(cry::RSAKey& client_priv) {
+        std::vector<uint8_t> dRs = cry::decrypt_rsa(eRs, client_priv);
+        std::copy(dRs.data(), dRs.data() + 32, Rs.data());
+
+        std::vector<uint8_t> dRc = cry::decrypt_aes(eRc, {}, Rs);
+        std::copy(dRc.data(), dRc.data() + 32, Rc.data());
+    }
+
+    std::vector<uint8_t> serialize() const {
+        Encoder e;
+        e.put(static_cast<uint8_t>(MessageType::ServerResp));
+        e.put(eRs);
+        e.put(eRc);
+        return e.move();
+    }
+
+    static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
+        Decoder msg{data};
+        msg.get_u8();
+        auto eRs = msg.get_vec(512);
+        auto eRc = msg.get_vec();
+
+        return std::unique_ptr<ServerResp>(new ServerResp{eRs, eRc});
+    }
+
+    std::pair<std::array<uint8_t, 32>, std::array<uint8_t, 32>> get() const {
+        return {Rs, Rc};
+    }
+
+    friend bool operator==(const ServerResp& lhs, const ServerResp& rhs) {
+        return lhs.Rs == rhs.Rs && lhs.Rc == rhs.Rc;
+    }
+};
+
 /**
  * Send message - to another user
  *
@@ -253,6 +309,7 @@ public:
     MessageDeserializer() {
         // create mapping between message types and deserialize function pointer
         deserialize_map.insert({MessageType::ClientInit, &ClientInit::deserialize});
+        deserialize_map.insert({MessageType::ServerResp, &ServerResp::deserialize});
         deserialize_map.insert({MessageType::Send, &Send::deserialize});
         deserialize_map.insert({MessageType::Recv, &Recv::deserialize});
     }
