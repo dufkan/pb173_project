@@ -17,7 +17,12 @@
 #include "mbedtls/sha256.h"
 #include "mbedtls/x509.h"
 
+#include "codec.hpp"
+
+
 namespace cry {
+
+using AESKey = std::array<uint8_t, 32>;
 
 class RSAKey {
     mbedtls_rsa_context ctx[1];
@@ -56,7 +61,7 @@ public:
         return has_priv() && mbedtls_rsa_check_pub_priv(other.ctx, ctx) == 0;
     }
 
-    std::vector<uint8_t> export_pub() {
+    std::vector<uint8_t> export_pub() const {
         Encoder e;
         std::vector<uint8_t> N, P, Q, D, E;
         N.resize(1024);
@@ -73,7 +78,7 @@ public:
         return e.move();
     }
 
-    std::vector<uint8_t> export_all() {
+    std::vector<uint8_t> export_all() const {
 
         Encoder e;
         std::vector<uint8_t> N, P, Q, D, E;

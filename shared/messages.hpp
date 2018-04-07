@@ -7,13 +7,15 @@
 #include <string>
 #include <functional>
 
+#include "crypto.hpp"
 #include "codec.hpp"
 
 namespace msg {
 
 enum class MessageType : uint8_t {
-    Register,
-    Login,
+    ClientInit,
+    ServerResp,
+    ClientResp,
     Logout,
     Send,
     Recv,
@@ -40,86 +42,85 @@ inline MessageType type(const std::vector<uint8_t>& msg) {
  */
 class Message {
 public:
-    /**
-     * Serialize message into binary representation.
-     */
-    virtual std::vector<uint8_t> serialize() const { return {}; };
-
     virtual ~Message() {}
 };
 
-/**
- * Register message
- *
- * Message for new user registration.
- */
-class Register : public Message {
-    std::string name;
+class ClientInit : public Message {
+#ifdef TESTMODE
+public:
+#endif
+    std::string pseudonym;
+    std::array<uint8_t, 32> Rc;
     std::vector<uint8_t> key;
 
+    std::vector<uint8_t> eRc;
+    std::vector<uint8_t> epayload;
+
+    ClientInit(std::vector<uint8_t> eRc, std::vector<uint8_t> epayload):
+        eRc(std::move(eRc)), epayload(std::move(epayload)) {}
+
 public:
-    /**
-     * Create new instance of Register message.
-     *
-     * @param name Pseudonym of the user
-     * @param key Public key of the user
-     */
-    Register(std::string name, std::vector<uint8_t> key): name(name), key(key) {}
+    ClientInit(std::string pseudonym, std::array<uint8_t, 32> Rc, std::vector<uint8_t> key):
+        pseudonym(std::move(pseudonym)), Rc(std::move(Rc)), key(std::move(key)) {}
 
-    /**
-     * Deserialize Register message from its binary representation
-     *
-     * @param data Binary representation of Register message (without the first byte AKA type byte)
-     *
-     * @return Unique pointer to the deserialized Message
-     */
+    void encrypt(cry::RSAKey& server_pub) {
+        eRc = cry::encrypt_rsa(Rc, server_pub);
+
+        Encoder e;
+        e.put(static_cast<uint16_t>(pseudonym.size()));
+        e.put(pseudonym);
+        e.put(static_cast<uint16_t>(key.size()));
+        e.put(key);
+
+        epayload = cry::encrypt_aes(e.move(), {}, Rc);
+    }
+
+    void decrypt(cry::RSAKey& server_priv) {
+        std::vector<uint8_t> dRc = cry::decrypt_rsa(eRc, server_priv);
+        std::copy(dRc.data(), dRc.data() + 32, Rc.data());
+
+        Decoder d{cry::decrypt_aes(epayload, {}, Rc)};
+        auto plen = d.get_u16();
+        pseudonym = d.get_str(plen);
+        auto klen = d.get_u16();
+        key = d.get_vec(klen);
+    }
+
+    std::vector<uint8_t> serialize() const {
+        Encoder e;
+        e.put(static_cast<uint8_t>(MessageType::ClientInit));
+        e.put(eRc);
+        e.put(epayload);
+        return e.move();
+    }
+
     static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
-        Decoder message{data};
-        message.get_u8();
-        uint8_t namelen = message.get_u8();
-        std::string name = message.get_str(namelen);
-        uint16_t keylen = message.get_u16();
-        std::vector<uint8_t> key = message.get_vec(keylen);
-        return std::make_unique<Register>(name, key);
+        Decoder msg{data};
+        msg.get_u8();
+
+        std::vector<uint8_t> eRc = msg.get_vec(512);
+        std::vector<uint8_t> epayload = msg.get_vec();
+
+        return std::unique_ptr<ClientInit>(new ClientInit{eRc, epayload});
     }
 
-    std::vector<uint8_t> serialize() const override {
-        Encoder message;
-        message.reserve(name.length() + key.size() + 2 + 1 + 1);
-        message.put(static_cast<uint8_t>(MessageType::Register));
-        message.put(static_cast<uint8_t>(name.size()));
-        message.put(name);
-        message.put(static_cast<uint16_t>(key.size()));
-        message.put(key);
-        return message.move();
-    };
-
-    /**
-     * Get pseudonym from the message
-     *
-     * @return Pseudonym
-     */
-    std::string get_name() const {
-        return name;
-    }
-    
-    
-    std::vector<uint8_t> get_key() const {
-	return key;
+    std::tuple<std::array<uint8_t, 32>, std::string, std::vector<uint8_t>> get() const {
+        return {Rc, pseudonym, key};
     }
 
-
-    bool operator== (const Register& a) const {
-        return name == a.name && key == a.key;
+    friend bool operator==(const ClientInit& lhs, const ClientInit& rhs) {
+        return lhs.pseudonym == rhs.pseudonym && lhs.Rc == rhs.Rc && lhs.key == rhs.key;
     }
 };
-
 
 /**
  * Send message - to another user
  *
  */
 class Send : public Message {
+#ifdef TESTMODE
+public:
+#endif
     std::string receiver;
     std::vector<uint8_t> text;
 
@@ -152,7 +153,7 @@ public:
     }
 
 
-    std::vector<uint8_t> serialize() const override {
+    std::vector<uint8_t> serialize() const {
         Encoder message;
         message.reserve(text.size() + receiver.size() + 1 + 2 + 1);
         message.put(static_cast<uint8_t>(MessageType::Send));
@@ -180,6 +181,9 @@ public:
  * Recieve message - from another user
  */
 class Recv : public Message {
+#ifdef TESTMODE
+public:
+#endif
     std::string sender;
     std::vector<uint8_t> text;
 
@@ -209,7 +213,7 @@ public:
     }
 
 
-    std::vector<uint8_t> serialize() const override {
+    std::vector<uint8_t> serialize() const {
         Encoder message;
         message.reserve(text.size() + sender.size() + 1 + 2 + 1);
         message.put(static_cast<uint8_t>(MessageType::Recv));
@@ -248,7 +252,7 @@ class MessageDeserializer {
 public:
     MessageDeserializer() {
         // create mapping between message types and deserialize function pointer
-        deserialize_map.insert({MessageType::Register, &Register::deserialize});
+        deserialize_map.insert({MessageType::ClientInit, &ClientInit::deserialize});
         deserialize_map.insert({MessageType::Send, &Send::deserialize});
         deserialize_map.insert({MessageType::Recv, &Recv::deserialize});
     }
