@@ -20,24 +20,12 @@ public:
     std::map<std::string, std::array<uint8_t,32>> contacts;
     std::string pseudonym = "noone";
 
-
+    msg::MessageDeserializer message_deserializer;
 
     std::vector<uint8_t> client_challenge(std::array<uint8_t, 32> Rc, cry::RSAKey& rsa_pub, std::string pseudo, std::vector<uint8_t> key) {
-        Encoder e;
-        std::vector<uint8_t> eRc = cry::encrypt_rsa(Rc, rsa_pub);
-
-        e.put(static_cast<uint16_t>(pseudo.size()));
-        e.put(pseudo);
-        e.put(static_cast<uint16_t>(key.size()));
-        e.put(key);
-
-        std::vector<uint8_t> payload = e.move();
-        std::vector<uint8_t> ePayload = cry::encrypt_aes(payload, {}, Rc);
-
-        e.put(eRc);
-        e.put(ePayload);
-
-        return e.move();
+        msg::ClientInit message{pseudo, Rc, key};
+        message.encrypt(rsa_pub);
+        return message.serialize();
     }
 
     std::vector<uint8_t> client_response(std::array<uint8_t, 32> K,  std::array<uint8_t, 32> Rs) {
@@ -177,10 +165,14 @@ public:
         cry::RSAKey ckey;
         cry::generate_rsa_keys(ckey, ckey);
 
-        std::vector<uint8_t> chall = client_challenge(Rc, spub, pseudonym, ckey.export_pub());
-        chan.send(chall);
+        msg::ClientInit init{pseudonym, Rc, ckey.export_pub()};
+        init.encrypt(spub);
+        chan.send(init);
 
-        auto [Rs, verify_Rc] = decode_server_chr(chan.recv(), ckey);
+        auto uniq_sresp = message_deserializer(chan.recv());
+        auto sresp = dynamic_cast<msg::ServerResp&>(*uniq_sresp.get());
+        sresp.decrypt(ckey);
+        auto [Rs, verify_Rc] = sresp.get();
 
         if(verify_Rc != Rc) {
             std::cerr << "There is a BIG problem!" << std::endl;
@@ -192,7 +184,9 @@ public:
         e.put(Rc);
         std::array<uint8_t, 32> K = cry::hash_sha(e.move());
 
-        chan.send(client_response(K, Rs));
+        msg::ClientResp cresp{Rs};
+        cresp.encrypt(K);
+        chan.send(cresp);
 
         chan.set_key(K);
         std::cout << "I am in!" << std::endl;

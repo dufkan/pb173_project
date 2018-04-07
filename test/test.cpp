@@ -30,9 +30,9 @@ TEST_CASE("Challenge-Response") {
     cry::random_data(Rc);
 
     std::string pseudonym = "TEST";
-    auto cinit = msg::ClientInit{pseudonym, Rc, CLIENT_KEY.export_pub()};
+    msg::ClientInit cinit{pseudonym, Rc, CLIENT_KEY.export_pub()};
     cinit.encrypt(SERVER_KEY);
-    auto uniq_cinit = md.deserialize(cinit.serialize());
+    auto uniq_cinit = md(cinit.serialize());
     auto real_cinit = dynamic_cast<msg::ClientInit&>(*uniq_cinit.get());
     real_cinit.decrypt(SERVER_KEY);
     auto [server_Rc, server_pseudonym, server_key] = real_cinit.get();
@@ -43,9 +43,9 @@ TEST_CASE("Challenge-Response") {
     std::array<uint8_t, 32> Rs;
     cry::random_data(Rs);
 
-    auto sresp = msg::ServerResp{Rs, Rc};
+    msg::ServerResp sresp{Rs, Rc};
     sresp.encrypt(CLIENT_KEY);
-    auto uniq_sresp = md.deserialize(sresp.serialize());
+    auto uniq_sresp = md(sresp.serialize());
     auto real_sresp = dynamic_cast<msg::ServerResp&>(*uniq_sresp.get());
     real_sresp.decrypt(CLIENT_KEY);
     auto [client_Rs, verify_Rc] = real_sresp.get();
@@ -58,7 +58,11 @@ TEST_CASE("Challenge-Response") {
     e.put(Rc);
     auto K = cry::hash_sha(e.move());
 
-    auto client_response = c.client_response(K, Rs);
-    auto verify_Rs = s.decode_client_response(client_response, K);
+    msg::ClientResp cresp{Rs};
+    cresp.encrypt(K);
+    auto uniq_cresp = md(cresp.serialize());
+    auto real_cresp = dynamic_cast<msg::ClientResp&>(*uniq_cresp.get());
+    real_cresp.decrypt(K);
+    auto verify_Rs = real_cresp.get();
     REQUIRE(verify_Rs == Rs); // client authenticated
 }

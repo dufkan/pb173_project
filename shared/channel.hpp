@@ -1,5 +1,7 @@
 #ifndef CHANNEL_HPP
 #define CHANNEL_HPP
+#include <type_traits>
+
 #include "asio.hpp"
 #include "crypto.hpp"
 
@@ -30,6 +32,12 @@ public:
 
 public:
     Channel(asio::ip::tcp::socket&& sock): sock(std::move(sock)) {}
+
+    template<typename M>
+    void send(const M& msg) {
+        [[maybe_unused]] const bool is_base = std::is_base_of<msg::Message, M>::value;
+        send(msg.serialize());
+    }
 
     void send(const std::vector<uint8_t>& msg) {
         std::vector<uint8_t> emsg;

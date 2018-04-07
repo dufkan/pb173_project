@@ -57,7 +57,10 @@ public:
 
             Channel chan{std::move(sock)};
 
-            auto [Rc, pseudonym, client_key] = decode_client_challenge(chan.recv(), server_key);
+            auto uniq_init = message_deserializer(chan.recv());
+            msg::ClientInit& init = dynamic_cast<msg::ClientInit&>(*uniq_init.get());
+            init.decrypt(server_key);
+            auto [Rc, pseudonym, client_key] = init.get();
 
             cry::RSAKey ck;
             ck.import(client_key);
@@ -65,14 +68,19 @@ public:
             std::array<uint8_t, 32> Rs;
             cry::random_data(Rs);
 
-            chan.send(server_chr(Rs, Rc, ck));
+            msg::ServerResp sresp{Rs, Rc};
+            sresp.encrypt(ck);
+            chan.send(sresp);
 
             Encoder e;
             e.put(Rs);
             e.put(Rc);
             auto K = cry::hash_sha(e.move());
 
-            std::array<uint8_t, 32> verify_Rs = decode_client_response(chan.recv(), K);
+            auto uniq_cresp = message_deserializer(chan.recv());
+            msg::ClientResp& cresp = dynamic_cast<msg::ClientResp&>(*uniq_cresp.get());
+            cresp.decrypt(K);
+            std::array<uint8_t, 32> verify_Rs = cresp.get();
 
             if(verify_Rs != Rs) {
                 std::cerr << "We got a BIG problem!" << std::endl;
@@ -123,43 +131,6 @@ public:
         return connected;
     }
 
-    std::vector<uint8_t> server_chr(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> Rc,  cry::RSAKey& rsa_pub) {
-        Encoder e;
-        std::vector<uint8_t> eRs = cry::encrypt_rsa(Rs, rsa_pub);
-        std::vector<uint8_t> eRc = cry::encrypt_aes(Rc, {}, Rs);
-
-        e.put(eRs);
-        e.put(eRc);
-
-        return e.move();
-    }
-
-    std::tuple<std::array<uint8_t, 32>, std::string, std::vector<uint8_t>> decode_client_challenge(const std::vector<uint8_t>& msg, cry::RSAKey& rsa_priv) {
-        Decoder d{msg};
-        std::vector<uint8_t> eRc = d.get_vec(512);
-        std::vector<uint8_t> epayload = d.get_vec();
-
-        std::vector<uint8_t> dRc = cry::decrypt_rsa(eRc, rsa_priv);
-        std::array<uint8_t, 32> Rc;
-        std::copy(dRc.data(), dRc.data() + 32, Rc.data());
-
-        auto dpayload = cry::decrypt_aes(epayload, {}, Rc);
-        d = dpayload; // copy assignment hopefully
-        auto plen = d.get_u16();
-        auto pseudonym = d.get_str(plen);
-        auto klen = d.get_u16();
-        auto key = d.get_vec(klen);
-
-        return {Rc, pseudonym, key};
-    }
-
-    std::array<uint8_t, 32> decode_client_response(const std::vector<uint8_t>& msg, const std::array<uint8_t, 32>& K) {
-        auto ok = cry::decrypt_aes(msg, {}, K);
-        std::array<uint8_t, 32> verify_Rs;
-        std::copy(ok.data(), ok.data() + 32, verify_Rs.data());
-        return verify_Rs;
-    }
-
     void handle_send(const std::string& pseudonym, msg::Send msg) {
         auto conn = connections.find(msg.get_receiver());
         msg::Recv recv{pseudonym, msg.get_text()};
@@ -176,7 +147,7 @@ public:
     }
 
     void handle_message(const std::string& pseudonym, std::vector<uint8_t> msg) {
-        std::unique_ptr<msg::Message> deserialized_msg = message_deserializer.deserialize(msg);
+        std::unique_ptr<msg::Message> deserialized_msg = message_deserializer(msg);
         switch(msg::type(msg)) {
             case msg::MessageType::Send:
                 handle_send(pseudonym, dynamic_cast<msg::Send&>(*deserialized_msg.get()));

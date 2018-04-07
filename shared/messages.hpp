@@ -370,6 +370,10 @@ public:
     std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& msg) {
         return deserialize_map[type(msg)](msg);
     }
+
+    std::unique_ptr<Message> operator()(const std::vector<uint8_t>& msg) {
+        return deserialize(msg);
+    }
 };
 
 } // namespace msg
