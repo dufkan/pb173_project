@@ -169,6 +169,51 @@ public:
     }
 };
 
+class ClientResp : public Message {
+#ifdef TESTMODE
+public:
+#endif
+    std::array<uint8_t, 32> Rs;
+
+    std::vector<uint8_t> eRs;
+
+    ClientResp(std::vector<uint8_t> eRs): eRs(std::move(eRs)) {}
+public:
+    ClientResp(std::array<uint8_t, 32> Rs): Rs(std::move(Rs)) {}
+
+    void encrypt(const std::array<uint8_t, 32>& K) {
+        eRs = cry::encrypt_aes(Rs, {}, K);
+    }
+
+    void decrypt(const std::array<uint8_t, 32>& K) {
+        auto dRs = cry::decrypt_aes(eRs, {}, K);
+        std::copy(dRs.data(), dRs.data() + 32, Rs.data());
+    }
+
+    std::vector<uint8_t> serialize() const {
+        Encoder e;
+        e.put(static_cast<uint8_t>(MessageType::ClientResp));
+        e.put(eRs);
+        return e.move();
+    }
+
+    static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
+        Decoder msg{data};
+        msg.get_u8();
+        auto eRs = msg.get_vec();
+
+        return std::unique_ptr<ClientResp>(new ClientResp{eRs});
+    }
+
+    std::array<uint8_t, 32> get() const {
+        return Rs;
+    }
+
+    friend bool operator==(const ClientResp& lhs, const ClientResp& rhs) {
+        return lhs.Rs == rhs.Rs;
+    }
+};
+
 /**
  * Send message - to another user
  *
@@ -310,6 +355,7 @@ public:
         // create mapping between message types and deserialize function pointer
         deserialize_map.insert({MessageType::ClientInit, &ClientInit::deserialize});
         deserialize_map.insert({MessageType::ServerResp, &ServerResp::deserialize});
+        deserialize_map.insert({MessageType::ClientResp, &ClientResp::deserialize});
         deserialize_map.insert({MessageType::Send, &Send::deserialize});
         deserialize_map.insert({MessageType::Recv, &Recv::deserialize});
     }
