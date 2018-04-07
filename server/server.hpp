@@ -138,7 +138,7 @@ public:
             message_queue[msg.get_receiver()].push(recv);
         }
         else {
-            // TODO send to user
+            conn->second.send(msg::Recv{pseudonym, msg.get_text()});
         }
     }
 

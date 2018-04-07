@@ -33,9 +33,8 @@ public:
 public:
     Channel(asio::ip::tcp::socket&& sock): sock(std::move(sock)) {}
 
-    template<typename M>
+    template<typename M, typename = typename std::enable_if<std::is_base_of<msg::Message, M>::value>>
     void send(const M& msg) {
-        [[maybe_unused]] const bool is_base = std::is_base_of<msg::Message, M>::value;
         send(msg.serialize());
     }
 

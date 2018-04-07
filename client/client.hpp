@@ -22,35 +22,6 @@ public:
 
     msg::MessageDeserializer message_deserializer;
 
-    std::vector<uint8_t> client_challenge(std::array<uint8_t, 32> Rc, cry::RSAKey& rsa_pub, std::string pseudo, std::vector<uint8_t> key) {
-        msg::ClientInit message{pseudo, Rc, key};
-        message.encrypt(rsa_pub);
-        return message.serialize();
-    }
-
-    std::vector<uint8_t> client_response(std::array<uint8_t, 32> K,  std::array<uint8_t, 32> Rs) {
-        std::vector<uint8_t> msg = cry::encrypt_aes(Rs, {}, K);
-        return msg;
-    }
-
-    std::pair<std::array<uint8_t, 32>, std::array<uint8_t, 32>> decode_server_chr(const std::vector<uint8_t>& msg, cry::RSAKey& priv_key) {
-        Decoder d{msg};
-        auto eRs = d.get_vec(512);
-        auto epayload = d.get_vec();
-
-        std::vector<uint8_t> dRs = cry::decrypt_rsa(eRs, priv_key);
-        std::array<uint8_t, 32> Rs;
-        std::copy(dRs.data(), dRs.data() + 32, Rs.data());
-
-        std::vector<uint8_t> dpayload = cry::decrypt_aes(epayload, {}, Rs);
-        d = dpayload; // copy assignment hopefully
-        std::vector<uint8_t> tmp = d.get_vec();
-        std::array<uint8_t, 32> verify_Rc;
-        std::copy(tmp.data(), tmp.data() + 32, verify_Rc.data());
-
-        return {Rs, verify_Rc};
-    }
-
     /**
      * Create message Send from params and encrypt the text with AES-256 recv_key
      *
@@ -60,8 +31,8 @@ public:
      *
      * @return message Send
      */
-    msg::Send create_message(std::string recv_name, std::array<uint8_t,32> recv_key, std::vector<uint8_t> text) {
-	std::vector text_enc = cry::encrypt_aes(text, {}, recv_key);
+    msg::Send create_message(std::string recv_name, std::array<uint8_t, 32> recv_key, std::vector<uint8_t> text) {
+        std::vector text_enc = cry::encrypt_aes(text, {}, recv_key);
         msg::Send msg_send(recv_name,text_enc);
         return msg_send;
     }
@@ -81,28 +52,26 @@ public:
             /* Send a message to server fot recv keys and prekeys.... */
 
         }
-        std::array<uint8_t,32> recv_key = it->second; 	
-	msg::Send msg_send = create_message(recv_name, recv_key, text_u);
-	chan.send(msg_send.serialize());
+        std::array<uint8_t, 32> recv_key = it->second;
+        msg::Send msg_send = create_message(recv_name, recv_key, text_u);
+        chan.send(msg_send);
     }
-    
-    
+
     /**
      * Decrypt text of message in message Recv
-     * 
+     *
      * @param msg_recv Recieved message
      * @return Pair (sender_name, decrypted_text)
      */
-
-    std::pair<std::string,std::vector<uint8_t>> decrypt_msg(msg::Recv& msg_recv) {
-	std::string sender_name = msg_recv.get_sender();
-	auto it = contacts.find(sender_name);
+    std::pair<std::string, std::vector<uint8_t>> decrypt_msg(msg::Recv& msg_recv) {
+        std::string sender_name = msg_recv.get_sender();
+        auto it = contacts.find(sender_name);
         if (it == contacts.end()) {
             /* Some error or resolution of it */
 
         }
-	std::vector<uint8_t> text_dec = cry::decrypt_aes(msg_recv.get_text(),{},it->second);
-	return std::make_pair(sender_name,text_dec);
+        std::vector<uint8_t> text_dec = cry::decrypt_aes(msg_recv.get_text(),{},it->second);
+        return std::make_pair(sender_name,text_dec);
     }
 
 
@@ -114,11 +83,11 @@ public:
      */
 
     std::pair<std::string,std::string> handle_recv_msg(std::vector<uint8_t> msg_u) {
-	std::unique_ptr<msg::Message> msg_des = msg::Recv::deserialize(msg_u);
-	msg::Recv& recv_des = dynamic_cast<msg::Recv&>(*msg_des.get());
-	auto sender_text = decrypt_msg(recv_des);
-	std::string text_s(reinterpret_cast<char*> (sender_text.second.data()),sender_text.second.size());
-	return std::make_pair(sender_text.first,text_s);
+        std::unique_ptr<msg::Message> msg_des = msg::Recv::deserialize(msg_u);
+        msg::Recv& recv_des = dynamic_cast<msg::Recv&>(*msg_des.get());
+        auto sender_text = decrypt_msg(recv_des);
+        std::string text_s(reinterpret_cast<char*> (sender_text.second.data()),sender_text.second.size());
+        return std::make_pair(sender_text.first,text_s);
     }
 
 public:
@@ -127,15 +96,14 @@ public:
 
     bool add_contact(std::string name, std::array<uint8_t,32> key) {
         auto it = contacts.find(name);
-	if (it != contacts.end()) {
-		return false;
-	}
-	contacts[name]=key;
-	return true;
+        if (it != contacts.end())
+            return false;
+        contacts[name]=key;
+        return true;
     }
-    
+
     std::array<uint8_t,32> get_key(std::string name) {
-	return contacts[name];
+        return contacts[name];
     }
 
 
@@ -149,6 +117,11 @@ public:
 
         Channel chan{std::move(sock)};
         initiate_connection(chan);
+        for(;;) {
+            send_message(pseudonym, "Ahoj, testuju zpravy v nejlepsim IM!", chan);
+            auto [p, t] = handle_recv_msg(chan.recv());
+            std::cout << p << ": " << t << std::endl;
+        }
     }
 
     /**
