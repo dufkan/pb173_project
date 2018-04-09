@@ -15,6 +15,9 @@
 #include <mutex>
 #include <iterator>
 
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+
 #include "asio.hpp"
 #include "../shared/messages.hpp"
 #include "../shared/crypto.hpp"
@@ -38,6 +41,37 @@ public:
 
     msg::MessageDeserializer message_deserializer;
     asio::io_service io_service;
+
+    void prepare_key() {
+        try {
+            std::vector<uint8_t> file_key = util::read_file("TOPSECRET");
+            server_key.import(file_key);
+        }
+        catch(std::ios_base::failure& e) {
+            cry::generate_rsa_keys(server_key, server_key);
+            util::write_file("TOPSECRET", server_key.export_all());
+            util::write_file("PUBSECRET", server_key.export_pub());
+        }
+    }
+
+    static std::vector<uint8_t> load_client_key(const std::string& pseudonym) {
+        if(!fs::exists("keys/" + pseudonym))
+            return {};
+        return util::read_file("keys/" + pseudonym);
+    }
+
+    static bool store_client_key(const std::string& pseudonym, const std::vector<uint8_t>& key) {
+        if(!fs::is_directory("keys"))
+            fs::create_directory("keys");
+        if(fs::exists("keys/" + pseudonym))
+            return false;
+        util::write_file("keys/" + pseudonym, key);
+        return true;
+    }
+
+    static bool remove_client_key(const std::string& pseudonym) {
+        return fs::remove("keys/" + pseudonym);
+    }
 
 public:
     Server() {
@@ -63,7 +97,13 @@ public:
             auto [Rc, pseudonym, client_key] = init.get();
 
             cry::RSAKey ck;
-            ck.import(client_key);
+            std::vector<uint8_t> local_key = load_client_key(pseudonym);
+            if(!local_key.empty())
+                ck.import(local_key);
+            else if(!client_key.empty())
+                ck.import(client_key);
+            else
+                continue; // TODO handle no key
 
             std::array<uint8_t, 32> Rs;
             cry::random_data(Rs);
@@ -88,6 +128,10 @@ public:
             }
 
             chan.set_key(K);
+
+            if(local_key.empty() && !client_key.empty())
+                store_client_key(pseudonym, client_key);
+
             {
                 std::unique_lock lock{connection_queue_mutex};
                 connection_queue.emplace_front(std::pair{pseudonym, std::move(chan)});
@@ -156,57 +200,5 @@ public:
                 handle_error(*deserialized_msg.get());
         }
     }
-
-    void prepare_key() {
-        try {
-            std::vector<uint8_t> file_key = util::read_file("TOPSECRET");
-            server_key.import(file_key);
-        }
-        catch(const std::ios_base::failure& e) {
-            cry::generate_rsa_keys(server_key, server_key);
-            util::write_file("TOPSECRET", server_key.export_all());
-            util::write_file("PUBSECRET", server_key.export_pub());
-        }
-    }
 };
-
-/**
- * Add new user to database.
- *
- * @param pseudonym Pseudonym of the user
- * @param pubkey Public key of the user
- * @return False if user already exists; true otherwise
- */
-bool add_user(std::string pseudonym, std::vector<uint8_t> pubkey) {
-    std::ifstream ifs{pseudonym};
-    if(ifs.good())
-        return false;
-
-    ifs.close();
-
-    util::write_file(pseudonym, pubkey);
-    return true;
-}
-
-/**
- * Remove user from the database.
- *
- * @param pseudonym Pseudonym of the user
- * @return True if operation succeded; false otherwise
- */
-bool remove_user(std::string pseudonym) {
-    return !std::remove(pseudonym.c_str());
-}
-
-/**
- * Get user information from database.
- *
- * @param pseudonym Pseudonym of the user
- *
- * @return Information about the user (public key)
- */
-std::vector<uint8_t> get_user(std::string pseudonym) {
-    return util::read_file(pseudonym);
-}
-
 #endif
