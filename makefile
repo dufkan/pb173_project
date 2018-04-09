@@ -10,7 +10,7 @@ TEST_JUNK=noread nowrite noexist keys/u*
 all: mbedtls smain cmain tests
 
 test: tests
-	mkdir keys
+	mkdir -p keys
 	rm -f $(TEST_JUNK)
 	touch noread nowrite
 	chmod -r noread

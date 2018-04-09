@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <cstdio>
 #include <iterator>
 #include <fstream>
 #include <map>
@@ -70,7 +71,18 @@ public:
     }
 
     static bool remove_client_key(const std::string& pseudonym) {
-        return fs::remove("keys/" + pseudonym);
+        std::string path = "keys/" + pseudonym;
+        return std::remove(path.c_str()) == 0;
+    }
+
+    void sync_connections() {
+        std::unique_lock lock{connection_queue_mutex, std::try_to_lock};
+        if(!lock.owns_lock())
+            return;
+        connections.insert(std::move_iterator(connection_queue.begin()), std::move_iterator(connection_queue.end()));
+        while(!connection_queue.empty()) {
+            connection_queue.pop_front();
+        }
     }
 
 public:
@@ -140,15 +152,6 @@ public:
         }
     }
 
-    void sync_connections() {
-        std::unique_lock lock{connection_queue_mutex, std::try_to_lock};
-        if(!lock.owns_lock())
-            return;
-        connections.insert(std::move_iterator(connection_queue.begin()), std::move_iterator(connection_queue.end()));
-        while(!connection_queue.empty()) {
-            connection_queue.pop_front();
-        }
-    }
 
     void run() {
         auto t = std::thread(&Server::connection_handler, this);
