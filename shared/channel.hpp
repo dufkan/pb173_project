@@ -1,16 +1,18 @@
 #ifndef CHANNEL_HPP
 #define CHANNEL_HPP
 #include <type_traits>
+#include <memory>
 
 #include "asio.hpp"
 #include "crypto.hpp"
+#include "crybox.hpp"
 
 class Channel {
 #ifdef TESTMODE
 public:
 #endif
     asio::ip::tcp::socket sock;
-    std::optional<std::array<uint8_t, 32>> key; // TODO replace with universal enc/dec module
+    std::unique_ptr<CryBox> crybox;
     Decoder decoder;
     uint16_t msglen = 0;
 
@@ -31,7 +33,7 @@ public:
     }
 
 public:
-    Channel(asio::ip::tcp::socket&& sock): sock(std::move(sock)) {}
+    Channel(asio::ip::tcp::socket&& sock): sock(std::move(sock)), crybox(std::make_unique<IdBox>()) {}
 
     template<typename M, typename = typename std::enable_if<std::is_base_of<msg::Message, M>::value>>
     void send(const M& msg) {
@@ -39,11 +41,7 @@ public:
     }
 
     void send(const std::vector<uint8_t>& msg) {
-        std::vector<uint8_t> emsg;
-        if (key)
-            emsg = cry::encrypt_aes(msg, {}, *key);
-        else
-            emsg = msg;
+        std::vector<uint8_t> emsg = crybox->encrypt(msg);
 
         Encoder e;
         e.put(static_cast<uint16_t>(emsg.size()));
@@ -63,9 +61,7 @@ public:
         msglen = 0;
         decoder.cut();
 
-        if(key)
-            return cry::decrypt_aes(msg, {}, *key);
-        return msg;
+        return crybox->decrypt(msg);
     }
 
     std::vector<uint8_t> try_recv() {
@@ -79,8 +75,8 @@ public:
         return {};
     }
 
-    void set_key(const std::array<uint8_t, 32>& val) {
-        key = val;
+    void set_crybox(std::unique_ptr<CryBox>&& cb) {
+        crybox = std::move(cb);
     }
 };
 

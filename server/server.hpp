@@ -25,6 +25,7 @@ namespace fs = std::experimental::filesystem;
 #include "../shared/channel.hpp"
 #include "../shared/codec.hpp"
 #include "../shared/util.hpp"
+#include "../shared/crybox.hpp"
 
 class Server {
 #ifdef TESTMODE
@@ -212,7 +213,7 @@ void Server::connection_handler() {
             continue; // TODO exception
         }
 
-        chan.set_key(K);
+        chan.set_crybox(std::unique_ptr<CryBox>{new AESBox{K}});
 
         if(local_key.empty() && !client_key.empty())
             store_client_key(pseudonym, client_key);
