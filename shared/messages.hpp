@@ -23,6 +23,8 @@ enum class MessageType : uint8_t {
     RetPrekey,
     AskPrekey,
     UploadPrekey,
+    GetOnline,
+    RetOnline
 };
 
 /**
@@ -343,6 +345,9 @@ class ReqPrekey : public Message {};
 class RetPrekey : public Message {};
 class AskPrekey : public Message {};
 class UploadPrekey : public Message {};
+class GetOnline : public Message{};
+class RetOnline : public Message{};
+
 
 /**
  * Deserializer for recreating messages transfered through network

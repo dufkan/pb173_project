@@ -34,3 +34,10 @@ TEST_CASE("Create and recieve message","without network") {
 
     
 }
+
+/*
+TEST_CASE("Create message","Interaction with user"){
+    
+
+
+}*/
