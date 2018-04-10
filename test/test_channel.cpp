@@ -53,9 +53,9 @@ TEST_CASE("Channel with encryption") {
     cry::random_data(key);
 
     Channel schan{std::move(ssock)};
-    schan.set_key(key);
+    schan.set_crybox(std::unique_ptr<CryBox>{new AESBox{key}});
     Channel cchan{std::move(csock)};
-    cchan.set_key(key);
+    cchan.set_crybox(std::unique_ptr<CryBox>{new AESBox{key}});
 
     std::vector<uint8_t> msg{0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
     for(int i = 0; i < 5; ++i)
@@ -66,7 +66,7 @@ TEST_CASE("Channel with encryption") {
     REQUIRE(schan.try_recv() == std::vector<uint8_t>{});
 
     cry::random_data(key);
-    cchan.set_key(key);
+    cchan.set_crybox(std::unique_ptr<CryBox>{new AESBox{key}});
     for(int i = 0; i < 5; ++i)
         cchan.send(msg);
 
