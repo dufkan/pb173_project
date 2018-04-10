@@ -153,24 +153,24 @@ public:
 
 
 msg::Send Client::create_message(std::string recv_name, std::array<uint8_t, 32> recv_key, std::vector<uint8_t> text) {
-        std::vector text_enc = cry::encrypt_aes(text, {}, recv_key);
-        msg::Send msg_send(recv_name,text_enc);
-        return msg_send;
+    std::vector text_enc = cry::encrypt_aes(text, {}, recv_key);
+    msg::Send msg_send(recv_name,text_enc);
+    return msg_send;
 }
 
 
 
 void Client::send_message(std::string recv_name, std::string text, Channel& chan){
-        std::vector<uint8_t> text_u(text.begin(), text.end());
-        auto it = contacts.find(recv_name);
-        if (it == contacts.end()) {
-            /* Send a message to server fot recv keys and prekeys.... */
+    std::vector<uint8_t> text_u(text.begin(), text.end());
+    auto it = contacts.find(recv_name);
+    if (it == contacts.end()) {
+        /* Send a message to server fot recv keys and prekeys.... */
 	    /*Is this checking for the second time needed?*/
-        }
-        std::array<uint8_t, 32> recv_key = it->second;
-        msg::Send msg_send = create_message(recv_name, recv_key, text_u);
-        chan.send(msg_send);
     }
+    std::array<uint8_t, 32> recv_key = it->second;
+    msg::Send msg_send = create_message(recv_name, recv_key, text_u);
+    chan.send(msg_send);
+}
 
 
 
@@ -201,77 +201,77 @@ void Client::ui_send_message(Channel& chan) {
 
 
 std::pair<std::string, std::vector<uint8_t>> Client::decrypt_msg(msg::Recv& msg_recv) {
-        std::string sender_name = msg_recv.get_sender();
-        auto it = contacts.find(sender_name);
-        if (it == contacts.end()) {
-            /* Some error or resolution of it */
+   std::string sender_name = msg_recv.get_sender();
+   auto it = contacts.find(sender_name);
+   if (it == contacts.end()) {
+        /* Some error or resolution of it */
 
-        }
-        std::vector<uint8_t> text_dec = cry::decrypt_aes(msg_recv.get_text(),{},it->second);
-        return std::make_pair(sender_name,text_dec);
     }
+    std::vector<uint8_t> text_dec = cry::decrypt_aes(msg_recv.get_text(),{},it->second);
+    return std::make_pair(sender_name,text_dec);
+}
 
 
 std::pair<std::string,std::string> Client::handle_recv_msg(std::vector<uint8_t> msg_u) {
-        std::unique_ptr<msg::Message> msg_des = msg::Recv::deserialize(msg_u);
-        msg::Recv& recv_des = dynamic_cast<msg::Recv&>(*msg_des.get());
-        auto sender_text = decrypt_msg(recv_des);
-        std::string text_s(reinterpret_cast<char*> (sender_text.second.data()),sender_text.second.size());
-        return std::make_pair(sender_text.first,text_s);
-    }
+    std::unique_ptr<msg::Message> msg_des = msg::Recv::deserialize(msg_u);
+    msg::Recv& recv_des = dynamic_cast<msg::Recv&>(*msg_des.get());
+    auto sender_text = decrypt_msg(recv_des);
+    std::string text_s(reinterpret_cast<char*> (sender_text.second.data()),sender_text.second.size());
+    return std::make_pair(sender_text.first,text_s);
+}
 
 
 void Client::ui_recv_message(std::vector<uint8_t> msg) {
-       auto msg_param = handle_recv_msg(msg);
-       std::cout << "Message from: "<< msg_param.first << std::endl;
-       std::cout << "Text: " << msg_param.second << std::endl;
-    }
+    auto msg_param = handle_recv_msg(msg);
+    std::cout << "Message from: "<< msg_param.first << std::endl;
+    std::cout << "Text: " << msg_param.second << std::endl;
+}
 
 
 bool Client::add_contact(std::string name, std::array<uint8_t,32> key) {
-        auto it = contacts.find(name);
-        if (it != contacts.end())
-            return false;
-        contacts[name]=key;
-        return true;
-    }
+    auto it = contacts.find(name);
+    if (it != contacts.end())
+        return false;
+    contacts[name]=key;
+    return true;
+}
 
 
 std::array<uint8_t,32> Client::get_key(std::string name) {
-        return contacts[name];
-    }
+    return contacts[name];
+}
 
 
 std::vector<uint8_t> Client::load_key(){
 	std::string fname = pseudonym + ".key";
 	return util::read_file(fname);
-    }
+}
 
 
 
 void Client::write_key(std::vector<uint8_t>& key){
 	std::string fname = pseudonym + ".key"; 	
 	util::write_file(fname,key,false);
-    }
+}
 
 
 
 void Client::run() {
-        using asio::ip::tcp;
-        asio::io_service io_service;
+    using asio::ip::tcp;
+    asio::io_service io_service;
 
-        tcp::socket sock{io_service};
-        tcp::resolver resolver{io_service};
-        asio::connect(sock, resolver.resolve({"127.0.0.1", "1337"}));
+    tcp::socket sock{io_service};
+    tcp::resolver resolver{io_service};
+    asio::connect(sock, resolver.resolve({"127.0.0.1", "1337"}));
 
-        Channel chan{std::move(sock)};
-        initiate_connection(chan);
-        for(;;) {
-            send_message(pseudonym, "Ahoj, testuju zpravy v nejlepsim IM!", chan);
-            auto [p, t] = handle_recv_msg(chan.recv());
-            std::cout << p << ": " << t << std::endl;
-        }
+    Channel chan{std::move(sock)};
+    initiate_connection(chan);
+    for(;;) {
+        send_message(pseudonym, "Ahoj, testuju zpravy v nejlepsim IM!", chan);
+        auto [p, t] = handle_recv_msg(chan.recv());
+        std::cout << p << ": " << t << std::endl;
     }
+}
 
 
 

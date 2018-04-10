@@ -60,51 +60,37 @@ public:
     bool is_correct_priv(const RSAKey& other) const {
         return has_priv() && mbedtls_rsa_check_pub_priv(other.ctx, ctx) == 0;
     }
+    
+    /**
+     * Export public key to vector of bytes
+     *
+     * @return vector<uint8_t> with pubkey param
+     */
+    std::vector<uint8_t> export_pub() const;
 
-    std::vector<uint8_t> export_pub() const {
-        Encoder e;
-        std::vector<uint8_t> N, P, Q, D, E;
-        N.resize(1024);
-        P.resize(1024);
-        Q.resize(1024);
-        D.resize(1024);
-        E.resize(1024);
-        mbedtls_rsa_export_raw(ctx, N.data(), 1024, nullptr, 1024, nullptr, 1024, nullptr, 1024, E.data(), 1024);
-        e.put(N);
-        e.put(P);
-        e.put(Q);
-        e.put(D);
-        e.put(E);
-        return e.move();
-    }
 
-    std::vector<uint8_t> export_all() const {
 
-        Encoder e;
-        std::vector<uint8_t> N, P, Q, D, E;
-        N.resize(1024);
-        P.resize(1024);
-        Q.resize(1024);
-        D.resize(1024);
-        E.resize(1024);
-        mbedtls_rsa_export_raw(ctx, N.data(), 1024, P.data(), 1024, Q.data(), 1024, D.data(), 1024, E.data(), 1024);
-        e.put(N);
-        e.put(P);
-        e.put(Q);
-        e.put(D);
-        e.put(E);
-        return e.move();
-    }
+    /**
+     * Export everyting from RSA key
+     * 
+     * @return vector<uint8_t> with all parameters from RSA key
+     */
+    std::vector<uint8_t> export_all() const;
+ 
 
-    void import(const std::vector<uint8_t>& key) {
-        mbedtls_rsa_import_raw(ctx, key.data(), 1024, key.data() + 1024, 1024, key.data() + 2*1024, 1024, key.data() + 3*1024, 1024, key.data() + 4*1024, 1024);
-        mbedtls_rsa_complete(ctx);
-    }
+    /**
+     * Import from vector of bytes to RSA param
+     * 
+     */
+    void import(const std::vector<uint8_t>& key);
+
 
     ~RSAKey() {
         mbedtls_rsa_free(ctx);
     }
-};
+}; //class RSAKey
+
+
 
 /**
  * Pad given data vector using PKCS#7 padding method
@@ -112,11 +98,9 @@ public:
  * @param data Input data vector
  * @param bsize Block width to pad to
  */
-void pad(std::vector<uint8_t>& data, uint8_t bsize) {
-    int8_t val = bsize - (data.size() % bsize);
-    for(uint8_t i = 0; i < val; ++i)
-    data.push_back(val);
-}
+void pad(std::vector<uint8_t>& data, uint8_t bsize); 
+
+
 
 /**
  * Unpad given data vector using PKCS#7 padding method
@@ -124,12 +108,9 @@ void pad(std::vector<uint8_t>& data, uint8_t bsize) {
  * @param data Input data vector
  * @param bsize Block width to unpad to
  */
-void unpad(std::vector<uint8_t>& data, uint8_t bsize) {
-    if(data.size() < bsize) return;
-    uint8_t val = data[data.size() - 1];
-    if(val > bsize) return;
-    data.resize(data.size() - val);
-}
+void unpad(std::vector<uint8_t>& data, uint8_t bsize); 
+
+
 
 /**
  * Encrypt data vector with given key and IV by AES-256 in CBC mode
@@ -141,7 +122,199 @@ void unpad(std::vector<uint8_t>& data, uint8_t bsize) {
  * @return Vector of encrypted data
  */
 template <typename C>
-std::vector<uint8_t> encrypt_aes(const C& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key) {
+std::vector<uint8_t> encrypt_aes(const C& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key); 
+
+
+
+/**
+ * Decrypt data vector with given key and IV by AES-256 in CBC mode
+ *
+ * @param data Input data vector
+ * @param iv Initial vector for CBC
+ * @param key AES-256 key
+ *
+ * @return Vector of decrypted data
+ */
+std::vector<uint8_t> decrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key);
+
+ 
+
+/**
+ * Encrypt data vector with given public RSA-2048 key
+ *
+ * @param data Input data vector
+ * @param rsa_pub rsa context with public key to use for encryption
+ *
+ * @return Vector of encrypted data
+ */
+template <typename C>
+std::vector<uint8_t> encrypt_rsa(const C& data, RSAKey& key);
+
+ 
+
+/**
+ * Decrypt data vector with given private RSA-2048 key
+ *
+ * @param data Input data vector
+ * @param pubkey Private key to use for decryption
+ *
+ * @return Vector of encrypted data
+ */
+std::vector<uint8_t> decrypt_rsa(const std::vector<uint8_t>& data, cry::RSAKey& key); 
+
+
+
+/**
+ * Hash data by SHA2-256
+ *
+ * @param data Input data
+ *
+ * @return Hashed input data
+ */
+std::array<uint8_t, 32> hash_sha(const std::vector<uint8_t>& data); 
+
+
+
+/**
+ * Generate data hash and compare it with control_hash
+ * 
+ * @param data - input data
+ * @param control_hash
+ */
+bool check_hash(const std::vector<uint8_t>& data, const std::array <uint8_t,32>& control_hash);
+
+
+
+/**
+ * Generate random data of the length len
+ *
+ * @param len - length of the data
+ * @return - block of random data of length len
+ */
+std::vector<uint8_t> get_random_data(size_t len); 
+
+
+
+/**
+ * Fill a container with random data
+ *
+ * @param data - container
+ */
+template<typename C>
+void random_data(C& data); 
+
+
+
+/**
+ * Create new pair od keys for RSA
+ *
+* @param prikey - the new private key will be saved here
+ * @param pubkey - the new public key will be saved here
+ */
+
+void generate_rsa_keys(RSAKey& rsa_pub, RSAKey& rsa_priv);
+
+
+ 
+/**
+ * Create key by hashing data from fisrt_part and second_part
+ *
+ * @param first_part - data from challenge
+ * @param second_part - data from response
+ * @return symetric key created from chall and resp
+ */
+std::array<uint8_t,32> create_symmetric_key(std::vector<uint8_t> first, std::vector<uint8_t> second); 
+
+
+
+/**
+ * Generate MAC
+ *
+ * @param data
+ * @param key
+ * @return MAC for data and key
+ */
+template <typename C>
+std::array<uint8_t, 32> mac_data(const C& data, std::array<uint8_t, 32> key);
+
+
+
+/**
+ * Check if MAC is ok for data and key
+ *
+ * @param data
+ * @param key
+ * @return true if MAC is ok
+ */
+template <typename C>
+bool check_mac(const C& data, std::array<uint8_t, 32> key, std::array<uint8_t, 32> mac_to_check); 
+
+} // namespace cry
+
+
+
+
+
+
+
+std::vector<uint8_t> cry::RSAKey::export_pub() const {
+    Encoder e;
+    std::vector<uint8_t> N, P, Q, D, E;
+    N.resize(1024);
+    P.resize(1024);
+    Q.resize(1024);
+    D.resize(1024);
+    E.resize(1024);
+    mbedtls_rsa_export_raw(ctx, N.data(), 1024, nullptr, 1024, nullptr, 1024, nullptr, 1024, E.data(), 1024);
+    e.put(N);
+    e.put(P);
+    e.put(Q);
+    e.put(D);
+    e.put(E);
+    return e.move();
+}
+
+
+
+std::vector<uint8_t> cry::RSAKey::export_all() const {
+    Encoder e;
+    std::vector<uint8_t> N, P, Q, D, E;
+    N.resize(1024);
+    P.resize(1024);
+    Q.resize(1024);
+    D.resize(1024);
+    E.resize(1024);
+    mbedtls_rsa_export_raw(ctx, N.data(), 1024, P.data(), 1024, Q.data(), 1024, D.data(), 1024, E.data(), 1024);
+    e.put(N);
+    e.put(P);
+    e.put(Q);
+    e.put(D);
+    e.put(E);
+    return e.move();
+}
+ 
+
+void cry::RSAKey::import(const std::vector<uint8_t>& key) {
+    mbedtls_rsa_import_raw(ctx, key.data(), 1024, key.data() + 1024, 1024, key.data() + 2*1024, 1024, key.data() + 3*1024, 1024, key.data() + 4*1024, 1024);
+    mbedtls_rsa_complete(ctx);
+}
+
+
+void cry::pad(std::vector<uint8_t>& data, uint8_t bsize) {
+    int8_t val = bsize - (data.size() % bsize);
+    for(uint8_t i = 0; i < val; ++i)
+    data.push_back(val);
+}
+
+void cry::unpad(std::vector<uint8_t>& data, uint8_t bsize) {
+    if(data.size() < bsize) return;
+    uint8_t val = data[data.size() - 1];
+    if(val > bsize) return;
+    data.resize(data.size() - val);
+}
+
+template <typename C>
+std::vector<uint8_t> cry::encrypt_aes(const C& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key) {
     std::vector<uint8_t> mut_data{std::begin(data), std::end(data)};
     pad(mut_data, 32);
     std::vector<uint8_t> result;
@@ -156,16 +329,7 @@ std::vector<uint8_t> encrypt_aes(const C& data, std::array<uint8_t, 16> iv, cons
     return result;
 }
 
-/**
- * Decrypt data vector with given key and IV by AES-256 in CBC mode
- *
- * @param data Input data vector
- * @param iv Initial vector for CBC
- * @param key AES-256 key
- *
- * @return Vector of decrypted data
- */
-std::vector<uint8_t> decrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key) {
+std::vector<uint8_t> cry::decrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key) {
     std::vector<uint8_t> result;
     result.resize(data.size());
 
@@ -179,16 +343,8 @@ std::vector<uint8_t> decrypt_aes(const std::vector<uint8_t>& data, std::array<ui
     return result;
 }
 
-/**
- * Encrypt data vector with given public RSA-2048 key
- *
- * @param data Input data vector
- * @param rsa_pub rsa context with public key to use for encryption
- *
- * @return Vector of encrypted data
- */
 template <typename C>
-std::vector<uint8_t> encrypt_rsa(const C& data, RSAKey& key) {
+std::vector<uint8_t> cry::encrypt_rsa(const C& data, RSAKey& key) {
     std::vector<uint8_t> result;
 
     if(!key.has_pub())
@@ -212,15 +368,7 @@ std::vector<uint8_t> encrypt_rsa(const C& data, RSAKey& key) {
 
 }
 
-/**
- * Decrypt data vector with given private RSA-2048 key
- *
- * @param data Input data vector
- * @param pubkey Private key to use for decryption
- *
- * @return Vector of encrypted data
- */
-std::vector<uint8_t> decrypt_rsa(const std::vector<uint8_t>& data, cry::RSAKey& key) {
+std::vector<uint8_t> cry::decrypt_rsa(const std::vector<uint8_t>& data, cry::RSAKey& key) {
     std::vector<uint8_t> result;
     if (!key.has_priv())
         return result;
@@ -242,38 +390,19 @@ std::vector<uint8_t> decrypt_rsa(const std::vector<uint8_t>& data, cry::RSAKey& 
     return result;
 }
 
-/**
- * Hash data by SHA2-256
- *
- * @param data Input data
- *
- * @return Hashed input data
- */
-std::array<uint8_t, 32> hash_sha(const std::vector<uint8_t>& data) {
+std::array<uint8_t, 32> cry::hash_sha(const std::vector<uint8_t>& data) {
     std::array<uint8_t, 32> result;
     mbedtls_sha256_ret(data.data(), data.size(), result.data(), 0);
     return result;
 }
 
-/**
- * Generate data hash and compare it with control_hash
- * 
- * @param data - input data
- * @param control_hash
- */
-bool check_hash(const std::vector<uint8_t>& data, const std::array <uint8_t,32>& control_hash) {
+bool cry::check_hash(const std::vector<uint8_t>& data, const std::array <uint8_t,32>& control_hash) {
     std::array<uint8_t, 32> act_hash;
     mbedtls_sha256_ret(data.data(), data.size(), act_hash.data(), 0);
     return (act_hash==control_hash);
 }
 
-/**
- * Generate random data of the length len
- *
- * @param len - length of the data
- * @return - block of random data of length len
- */
-std::vector<uint8_t> get_random_data(size_t len) {
+std::vector<uint8_t> cry::get_random_data(size_t len) {
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_entropy_context entropy;
     std::vector<uint8_t> result;
@@ -290,13 +419,8 @@ std::vector<uint8_t> get_random_data(size_t len) {
     return result;
 }
 
-/**
- * Fill a container with random data
- *
- * @param data - container
- */
 template<typename C>
-void random_data(C& data) {
+void cry::random_data(C& data) {
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_entropy_context entropy;
 
@@ -311,14 +435,7 @@ void random_data(C& data) {
 }
 
 
-/**
- * Create new pair od keys for RSA
- *
-* @param prikey - the new private key will be saved here
- * @param pubkey - the new public key will be saved here
- */
-
-void generate_rsa_keys(RSAKey& rsa_pub, RSAKey& rsa_priv) {
+void cry::generate_rsa_keys(RSAKey& rsa_pub, RSAKey& rsa_priv) {
     int exponent = 65537;
     unsigned int key_size = 4096;
     mbedtls_rsa_context rsa;
@@ -351,22 +468,14 @@ void generate_rsa_keys(RSAKey& rsa_pub, RSAKey& rsa_priv) {
 }
 
 
-/**
- * Create key by hashing data from fisrt_part and second_part
- *
- * @param first_part - data from challenge
- * @param second_part - data from response
- * @return symetric key created from chall and resp
- */
-
-std::array<uint8_t,32> create_symmetric_key(std::vector<uint8_t> first, std::vector<uint8_t> second) {
+std::array<uint8_t,32> cry::create_symmetric_key(std::vector<uint8_t> first, std::vector<uint8_t> second) {
     first.resize(first.size() + second.size());
     first.insert(first.end(),second.begin(),second.end());
     return cry::hash_sha(first);
 }
 
 template <typename C>
-std::array<uint8_t, 32> mac_data(const C& data, std::array<uint8_t, 32> key) {
+std::array<uint8_t, 32> cry::mac_data(const C& data, std::array<uint8_t, 32> key) {
     const mbedtls_cipher_info_t *cipher_info;
     cipher_info = mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_256_CBC);
     std::array<uint8_t, 32> output;
@@ -378,11 +487,12 @@ std::array<uint8_t, 32> mac_data(const C& data, std::array<uint8_t, 32> key) {
 
 
 template <typename C>
-bool check_mac(const C& data, std::array<uint8_t, 32> key, std::array<uint8_t, 32> mac_to_check) {
+bool cry::check_mac(const C& data, std::array<uint8_t, 32> key, std::array<uint8_t, 32> mac_to_check) {
     std::array<uint8_t, 32> act_mac = cry::mac_data(data, key);
     return !(act_mac == mac_to_check);
 }
 
-} // namespace cry
+
+
 
 #endif
