@@ -50,12 +50,50 @@ public:
         auto it = contacts.find(recv_name);
         if (it == contacts.end()) {
             /* Send a message to server fot recv keys and prekeys.... */
-
+	    /*Is this checking for the second time needed?*/
         }
         std::array<uint8_t, 32> recv_key = it->second;
         msg::Send msg_send = create_message(recv_name, recv_key, text_u);
         chan.send(msg_send);
     }
+
+    /**
+     * Load psuedonym of the reciever
+     *
+     * @param recv_name
+     * @return true if recv_name is in conntacs
+     */
+    bool load_recv(std::string recv_name) {
+	std::cout << "Reciever - pseudonym: ";
+	std::getline(std::cin,recv_name);
+	auto it = contacts.find(recv_name);
+	return (it!=contacts.end());    
+    }
+
+
+    /**
+     * Load text of the message from user
+     * 
+     * @return the text
+     */
+    std::vector<uint8_t> load_text_message() {
+	std::string stext;
+	std::cout << "Text of the message: ";
+	std::getline(std::cin,stext);
+	return td::move(text);
+    }
+
+
+    void ui_send_message(Chennel& chan) {
+	std::string recv_name;
+	if(!load_recv(recv_name)) {
+	    /*chacked for the first time - handle with it*/
+	}
+	send_message(recv_name, load_text_message(), chan);
+    }
+
+
+
 
     /**
      * Decrypt text of message in message Recv
@@ -76,7 +114,7 @@ public:
 
 
     /**
-     * From recived vytes get get the sender and the text of message
+     * From recived bytes get get the sender and the text of message
      *
      * @param msg_u Recieved bytes
      * @return Pair(sender_name, text_of_message) 
@@ -90,10 +128,24 @@ public:
         return std::make_pair(sender_text.first,text_s);
     }
 
+
+    void ui_recv_message(std::vector<uint8_t> msg) {
+       auto msg_param = handle_recv_msg(msg);
+       std::cout << "Message from: "<< msg_param.first << std::endl;
+       std::cout << "Text: " << msg_param.second << std::endl;
+    }
+
 public:
     Client() = default;
     Client(std::string pseudonym): pseudonym(std::move(pseudonym)) {}
 
+    /**
+     * Save psuedonym and key to cantacts
+     *
+     * @param name Pseudonym
+     * @param key Key
+     * @return true is everything is OK, false is the contact is already saved
+     */
     bool add_contact(std::string name, std::array<uint8_t,32> key) {
         auto it = contacts.find(name);
         if (it != contacts.end())
@@ -102,8 +154,37 @@ public:
         return true;
     }
 
+
+    /**
+     * Get key for pseudonym from saved contacts
+     *
+     * @param name Pseudonym
+     * @return key
+     */
     std::array<uint8_t,32> get_key(std::string name) {
         return contacts[name];
+    }
+
+
+    /**
+     * Load key from file
+     *
+     * @return Key
+     */
+    std::vector<uint8_t> load_ key(){
+	std::string fname = pseudonym + ".key";
+	return util::read_file(fname);
+    }
+
+
+    /**
+     * Write key in file
+     * 
+     * @param key
+     */
+    void write_key(std::vector<uint8_t>& key){
+	std::string fname = psuedonym + ".key"; 	
+	util::write_file(fname,key,false);
     }
 
 
@@ -132,7 +213,7 @@ public:
         cry::RSAKey spub;
         spub.import(file_key);
 
-        std::array<uint8_t, 32> Rc;
+        spubtd::array<uint8_t, 32> Rc;
         cry::random_data(Rc);
 
         cry::RSAKey ckey;
