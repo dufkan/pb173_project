@@ -22,7 +22,7 @@ public:
 
     msg::MessageDeserializer message_deserializer;
 
-    /**
+     /**
      * Create message Send from params and encrypt the text with AES-256 recv_key
      *
      * @param recv_name Pseudonym of reciever of the message
@@ -31,46 +31,46 @@ public:
      *
      * @return message Send
      */
-    msg::Send create_message(std::string recv_name, std::array<uint8_t, 32> recv_key, std::vector<uint8_t> text); 
-
+    msg::Send create_message(std::string recv_name, std::array<uint8_t, 32> recv_key, std::vector<uint8_t> text);
 
 
     /**
-     * Send message text to client recv_name to channel
-     *
-     * @param recv_name Reciever name
-     * @param text Text of the message
+     * Encrypt text, create msg Send from params and return it as a vector of bytes ready to send
+     *   
+     * @param recv_name Pseudonym of receiver
+     * @param text text of the message
+     * @return vector of bytes with the message
      */
-    void send_message(std::string recv_name, std::string text, Channel& chan);
+    std::vector<uint8_t> send_msg_byte(std::string recv_name, std::string text);
 
-   
+
     /**
-     * Load psuedonym of the reciever
+     * Get from user receiver pseudonym
      *
-     * @param recv_name
-     * @return true if recv_name is in conntacs
+     * @param recv_name Pseudonym of receiver
+     * @return true if the pseudonym is saved in conntacts
      */
-    bool load_recv(std::string recv_name);
+    bool load_recv(std::string recv_name); 
+
 
 
     /**
-     * Load text of the message from user
-     * 
+     * Get from user text of the message and return it as a string
+     *
      * @return the text
      */
-    std::string load_text_message();
+    std::string load_text_message(); 
 
 
     /**
-     * Sending message with the params from user std::in
+     * Gets from user params for sending message
      *
-     * @param chan - Channel
+     * @return pair of receiver pseudonym and text of the message
      */
-    void ui_send_message(Channel& chan);
+    std::pair<std::string, std::string> ui_get_param_msg(); 
 
 
-
-    /**
+     /**
      * Decrypt text of message in message Recv
      *
      * @param msg_recv Recieved message
@@ -152,6 +152,8 @@ public:
 }; //Client
 
 
+
+
 msg::Send Client::create_message(std::string recv_name, std::array<uint8_t, 32> recv_key, std::vector<uint8_t> text) {
     std::vector text_enc = cry::encrypt_aes(text, {}, recv_key);
     msg::Send msg_send(recv_name,text_enc);
@@ -160,18 +162,19 @@ msg::Send Client::create_message(std::string recv_name, std::array<uint8_t, 32> 
 
 
 
-void Client::send_message(std::string recv_name, std::string text, Channel& chan){
+std::vector<uint8_t> Client::send_msg_byte(std::string recv_name, std::string text) {
     std::vector<uint8_t> text_u(text.begin(), text.end());
-    auto it = contacts.find(recv_name);
-    if (it == contacts.end()) {
+    auto it_recv = contacts.find(recv_name);
+    
+    if (it_recv == contacts.end()) {
         /* Send a message to server fot recv keys and prekeys.... */
-	    /*Is this checking for the second time needed?*/
+	    /*Is this checking for the second time needed?
+        This should be error, it is chacked here for the second time */
     }
-    std::array<uint8_t, 32> recv_key = it->second;
-    msg::Send msg_send = create_message(recv_name, recv_key, text_u);
-    chan.send(msg_send);
+    
+    msg::Send msg_send = create_message(recv_name, it_recv->second, text_u);
+    return  msg_send.serialize();
 }
-
 
 
 bool Client::load_recv(std::string recv_name) {
@@ -179,7 +182,8 @@ bool Client::load_recv(std::string recv_name) {
 	std::getline(std::cin,recv_name);
 	auto it = contacts.find(recv_name);
 	return (it!=contacts.end());    
-    }
+}
+
 
 
 std::string Client::load_text_message() {
@@ -190,24 +194,25 @@ std::string Client::load_text_message() {
     }
 
 
-void Client::ui_send_message(Channel& chan) {
+std::pair<std::string, std::string> Client::ui_get_param_msg() {
 	std::string recv_name;
 	if(!load_recv(recv_name)) {
-	    /*chacked for the first time - handle with it*/
+	    /* Load pseudonym of receiver which is not saved in conntacts
+           Does the user want to load the key and save it? */
 	}
-	send_message(recv_name, load_text_message(), chan);
-    }
+	return std::make_pair(recv_name, load_text_message());
+}
 
 
 
 std::pair<std::string, std::vector<uint8_t>> Client::decrypt_msg(msg::Recv& msg_recv) {
-   std::string sender_name = msg_recv.get_sender();
-   auto it = contacts.find(sender_name);
-   if (it == contacts.end()) {
+    std::string sender_name = msg_recv.get_sender();
+    auto it_sender = contacts.find(sender_name);
+    if (it_sender == contacts.end()) {
         /* Some error or resolution of it */
 
     }
-    std::vector<uint8_t> text_dec = cry::decrypt_aes(msg_recv.get_text(),{},it->second);
+    std::vector<uint8_t> text_dec = cry::decrypt_aes(msg_recv.get_text(),{},it_sender->second);
     return std::make_pair(sender_name,text_dec);
 }
 
@@ -215,6 +220,12 @@ std::pair<std::string, std::vector<uint8_t>> Client::decrypt_msg(msg::Recv& msg_
 std::pair<std::string,std::string> Client::handle_recv_msg(std::vector<uint8_t> msg_u) {
     std::unique_ptr<msg::Message> msg_des = msg::Recv::deserialize(msg_u);
     msg::Recv& recv_des = dynamic_cast<msg::Recv&>(*msg_des.get());
+    
+    auto it = contacts.find(recv_des.get_sender());
+    if (it == contacts.end()) {
+        /* Some error or resolution of it */
+
+    } 
     auto sender_text = decrypt_msg(recv_des);
     std::string text_s(reinterpret_cast<char*> (sender_text.second.data()),sender_text.second.size());
     return std::make_pair(sender_text.first,text_s);
@@ -267,7 +278,7 @@ void Client::run() {
     Channel chan{std::move(sock)};
     initiate_connection(chan);
     for(;;) {
-        send_message(pseudonym, "Ahoj, testuju zpravy v nejlepsim IM!", chan);
+        chan.send(send_msg_byte(pseudonym, "Ahoj, testuju zpravy v nejlepsim IM!"));
         auto [p, t] = handle_recv_msg(chan.recv());
         std::cout << p << ": " << t << std::endl;
     }
@@ -293,10 +304,15 @@ void Client::initiate_connection(Channel& chan){
     auto uniq_sresp = message_deserializer(chan.recv());
     auto sresp = dynamic_cast<msg::ServerResp&>(*uniq_sresp.get());
     sresp.decrypt(ckey);
+    if (!sresp.check_mac()){
+        /*trouble with integrity*/
+        std::cerr << "Problem with integrity, MAC of sresp" << std::endl;
+        return; //TODO handle with excetion
+    }
     auto [Rs, verify_Rc] = sresp.get();
 
     if(verify_Rc != Rc) {
-        std::cerr << "There is a BIG problem!" << std::endl;
+        std::cerr << "There is a BIG problem! 'Rc != Rc'" << std::endl;
         return; // TODO handle with exception
     }
 

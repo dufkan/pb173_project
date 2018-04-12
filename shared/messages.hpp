@@ -43,8 +43,19 @@ inline MessageType type(const std::vector<uint8_t>& msg) {
  * Teoretical concept. Not yet fully functional.
  */
 class Message {
+/*protected:
+    std::array<uint8_t,32> mac;
+*/
 public:
     virtual ~Message() {}
+    
+  /*  std::array<uint8_t, 32> get_mac() {
+        return mac;
+    }
+
+    bool check_mac() {}
+  */  
+
 };
 
 class ClientInit : public Message {
@@ -52,18 +63,21 @@ class ClientInit : public Message {
 public:
 #endif
     std::string pseudonym;
+    
     std::array<uint8_t, 32> Rc;
     std::vector<uint8_t> key;
 
     std::vector<uint8_t> eRc;
     std::vector<uint8_t> epayload;
 
-    ClientInit(std::vector<uint8_t> eRc, std::vector<uint8_t> epayload):
-        eRc(std::move(eRc)), epayload(std::move(epayload)) {}
+    std::array<uint8_t,32> mac;    
 
+    ClientInit(std::vector<uint8_t> eRc, std::vector<uint8_t> epayload, std::array<uint8_t,32> mac = {}):
+        eRc(std::move(eRc)), epayload(std::move(epayload)), mac(mac) {}
+     
 public:
-    ClientInit(std::string pseudonym, std::array<uint8_t, 32> Rc, std::vector<uint8_t> key):
-        pseudonym(std::move(pseudonym)), Rc(std::move(Rc)), key(std::move(key)) {}
+    ClientInit(std::string pseudonym, std::array<uint8_t, 32> Rc, std::vector<uint8_t> key, std::array<uint8_t,32> mac = {}):
+        pseudonym(std::move(pseudonym)), Rc(std::move(Rc)), key(std::move(key)), mac(mac) {}
 
     void encrypt(cry::RSAKey& server_pub) {
         eRc = cry::encrypt_rsa(Rc, server_pub);
@@ -91,6 +105,7 @@ public:
     std::vector<uint8_t> serialize() const {
         Encoder e;
         e.put(static_cast<uint8_t>(MessageType::ClientInit));
+        e.put(cry::mac_data(epayload,Rc));
         e.put(eRc);
         e.put(epayload);
         return e.move();
@@ -100,10 +115,13 @@ public:
         Decoder msg{data};
         msg.get_u8();
 
+        //std::vector<uint8_t> mmac =  msg.get_vec(32);
+        //std::copy(mmac.data(), mmac.data() + 32, mac.data());
+        std::array<uint8_t,32> mmac = msg.get_arr<32>();
         std::vector<uint8_t> eRc = msg.get_vec(512);
         std::vector<uint8_t> epayload = msg.get_vec();
-
-        return std::unique_ptr<ClientInit>(new ClientInit{eRc, epayload});
+        
+        return std::unique_ptr<ClientInit>(new ClientInit{eRc, epayload, mmac});
     }
 
     std::tuple<std::array<uint8_t, 32>, std::string, std::vector<uint8_t>> get() const {
@@ -112,6 +130,10 @@ public:
 
     friend bool operator==(const ClientInit& lhs, const ClientInit& rhs) {
         return lhs.pseudonym == rhs.pseudonym && lhs.Rc == rhs.Rc && lhs.key == rhs.key;
+    }
+
+    bool check_mac(){
+        return cry::check_mac(epayload,Rc,mac);
     }
 };
 
@@ -125,13 +147,18 @@ public:
     std::vector<uint8_t> eRs;
     std::vector<uint8_t> eRc;
 
+    std::array<uint8_t,32> mac;
 
-    ServerResp(std::vector<uint8_t> eRs, std::vector<uint8_t> eRc):
-        eRs(std::move(eRs)), eRc(std::move(eRc)) {}
+      
+    ServerResp(std::vector<uint8_t> eRs, std::vector<uint8_t> eRc, std::array<uint8_t,32> mac = {}):
+        eRs(std::move(eRs)), eRc(std::move(eRc)), mac(mac) {}
+    
+
 public:
-    ServerResp(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> Rc):
-        Rs(std::move(Rs)), Rc(std::move(Rc)) {}
+    ServerResp(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> Rc, std::array<uint8_t,32> mac={}):
+        Rs(std::move(Rs)), Rc(std::move(Rc)), mac(mac) {}
 
+    
     void encrypt(cry::RSAKey& client_pub) {
         eRs = cry::encrypt_rsa(Rs, client_pub);
         eRc = cry::encrypt_aes(Rc, {}, Rs);
@@ -148,6 +175,7 @@ public:
     std::vector<uint8_t> serialize() const {
         Encoder e;
         e.put(static_cast<uint8_t>(MessageType::ServerResp));
+        e.put(cry::mac_data(eRc,Rs));
         e.put(eRs);
         e.put(eRc);
         return e.move();
@@ -156,10 +184,13 @@ public:
     static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
         Decoder msg{data};
         msg.get_u8();
+        //std::vector<uint8_t> mmac = msg.get_vec(32);
+        //std::copy(mmac.data(), mmac.data() + 32, mac.data());
+        std::array<uint8_t,32> mmac = msg.get_arr<32>();
         auto eRs = msg.get_vec(512);
         auto eRc = msg.get_vec();
 
-        return std::unique_ptr<ServerResp>(new ServerResp{eRs, eRc});
+        return std::unique_ptr<ServerResp>(new ServerResp{eRs, eRc, mmac});
     }
 
     std::pair<std::array<uint8_t, 32>, std::array<uint8_t, 32>> get() const {
@@ -169,6 +200,10 @@ public:
     friend bool operator==(const ServerResp& lhs, const ServerResp& rhs) {
         return lhs.Rs == rhs.Rs && lhs.Rc == rhs.Rc;
     }
+
+    bool check_mac() {
+        return cry::check_mac(eRc,Rs,mac);
+    }
 };
 
 class ClientResp : public Message {
@@ -176,8 +211,8 @@ class ClientResp : public Message {
 public:
 #endif
     std::array<uint8_t, 32> Rs;
-
     std::vector<uint8_t> eRs;
+
 
     ClientResp(std::vector<uint8_t> eRs): eRs(std::move(eRs)) {}
 public:
@@ -214,6 +249,7 @@ public:
     friend bool operator==(const ClientResp& lhs, const ClientResp& rhs) {
         return lhs.Rs == rhs.Rs;
     }
+
 };
 
 /**
@@ -238,6 +274,7 @@ public:
      */
     Send(std::string receiver, std::vector<uint8_t> text): receiver(receiver), text(text) {}
 
+
     /**
      * Deserialize Send message from its binary representation
      *
@@ -256,6 +293,11 @@ public:
     }
 
 
+    /** 
+     * Serialize message
+     *
+     * @return vector of bytes
+     */
     std::vector<uint8_t> serialize() const {
         Encoder message;
         message.reserve(text.size() + receiver.size() + 1 + 2 + 1);
@@ -315,7 +357,11 @@ public:
         return std::make_unique<Recv>(name, text);
     }
 
-
+    /**
+     * Serialize message
+     *
+     * @return vector of bytes
+     */
     std::vector<uint8_t> serialize() const {
         Encoder message;
         message.reserve(text.size() + sender.size() + 1 + 2 + 1);

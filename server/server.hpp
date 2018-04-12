@@ -176,10 +176,20 @@ void Server::connection_handler() {
         acc.accept(sock);
 
         Channel chan{std::move(sock)};
+        
+        //std::vector<uint8_t> recv_byte = chan.recv();
+                
 
         auto uniq_init = message_deserializer(chan.recv());
         msg::ClientInit& init = dynamic_cast<msg::ClientInit&>(*uniq_init.get());
         init.decrypt(server_key);
+        
+        if(!init.check_mac()) {
+            /* Trouble with integrity MAC*/
+            std::cerr << "Trouble with integrity - MAC client init msg on server." << std::endl;
+            return;
+        }
+
         auto [Rc, pseudonym, client_key] = init.get();
 
         cry::RSAKey ck;
@@ -209,7 +219,7 @@ void Server::connection_handler() {
         std::array<uint8_t, 32> verify_Rs = cresp.get();
 
         if(verify_Rs != Rs) {
-            std::cerr << "We got a BIG problem!" << std::endl;
+            std::cerr << "We got a BIG problem! 'Rs != Rs'" << std::endl;
             continue; // TODO exception
         }
 
