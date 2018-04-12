@@ -171,7 +171,8 @@ std::vector<uint8_t> decrypt_rsa(const std::vector<uint8_t>& data, cry::RSAKey& 
  *
  * @return Hashed input data
  */
-std::array<uint8_t, 32> hash_sha(const std::vector<uint8_t>& data); 
+template<typename C>
+std::array<uint8_t, 32> hash_sha(const C& data); 
 
 
 
@@ -390,7 +391,8 @@ std::vector<uint8_t> cry::decrypt_rsa(const std::vector<uint8_t>& data, cry::RSA
     return result;
 }
 
-std::array<uint8_t, 32> cry::hash_sha(const std::vector<uint8_t>& data) {
+template<typename C>
+std::array<uint8_t, 32> cry::hash_sha(const C& data) {
     std::array<uint8_t, 32> result;
     mbedtls_sha256_ret(data.data(), data.size(), result.data(), 0);
     return result;
