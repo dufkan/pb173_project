@@ -2,10 +2,17 @@
 #define CHANNEL_HPP
 #include <type_traits>
 #include <memory>
+#include <exception>
+#include <chrono>
 
 #include "asio.hpp"
 #include "crypto.hpp"
 #include "crybox.hpp"
+
+class ChannelException : public std::runtime_error {
+public:
+    ChannelException(std::string err): std::runtime_error(std::move(err)) {}
+};
 
 class Channel {
 #ifdef TESTMODE
@@ -14,12 +21,24 @@ public:
     asio::ip::tcp::socket sock;
     std::unique_ptr<CryBox> crybox;
     Decoder decoder;
+    bool alive = true;
+    std::chrono::time_point<std::chrono::steady_clock> last;
     uint16_t msglen = 0;
 
     size_t recv_data() {
+        asio::error_code ec;
+        if(!is_alive()) {
+            throw ChannelException{"Socket is dead."};
+        }
+
         uint8_t buffer[1024];
-        size_t len = sock.read_some(asio::buffer(buffer, 1024));
+        size_t len = sock.read_some(asio::buffer(buffer, 1024), ec);
         decoder.append(buffer, len);
+        if(ec == asio::error::eof || ec == asio::error::connection_reset)
+            alive = false;
+
+        last = std::chrono::steady_clock::now();
+
         return len;
     }
 
@@ -33,7 +52,7 @@ public:
     }
 
 public:
-    Channel(asio::ip::tcp::socket&& sock): sock(std::move(sock)), crybox(std::make_unique<IdBox>()) {}
+    Channel(asio::ip::tcp::socket&& sock): sock(std::move(sock)), crybox(std::make_unique<IdBox>()), last(std::chrono::steady_clock::now()) {}
 
     template<typename M, typename = typename std::enable_if<std::is_base_of<msg::Message, M>::value>>
     void send(const M& msg) {
@@ -47,8 +66,15 @@ public:
         e.put(static_cast<uint16_t>(emsg.size()));
         std::vector<uint8_t> header = e.move();
 
-        asio::write(sock, asio::buffer(header));
-        asio::write(sock, asio::buffer(emsg));
+        try {
+            asio::write(sock, asio::buffer(header));
+            asio::write(sock, asio::buffer(emsg));
+            last = std::chrono::steady_clock::now();
+        }
+        catch(std::exception e) {
+            alive = false;
+            throw ChannelException{"Socket is dead."};
+        }
     }
 
     std::vector<uint8_t> recv() {
@@ -65,6 +91,9 @@ public:
     }
 
     std::vector<uint8_t> try_recv() {
+        if(!is_alive())
+            return {};
+
         try_msglen();
         if(msglen == 0 && sock.available() >= 2) {
             recv_data();
@@ -77,6 +106,14 @@ public:
 
     void set_crybox(std::unique_ptr<CryBox>&& cb) {
         crybox = std::move(cb);
+    }
+
+    bool is_alive() {
+        return alive && sock.is_open();
+    }
+
+    std::chrono::seconds silence_duration() {
+        return std::chrono::duration_cast<std::chrono::seconds>(last - std::chrono::steady_clock::now());
     }
 };
 

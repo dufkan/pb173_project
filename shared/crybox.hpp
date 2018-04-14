@@ -25,6 +25,8 @@ public:
      * @return Decrypted output
      */
     virtual std::vector<uint8_t> decrypt(std::vector<uint8_t> data) = 0;
+
+    virtual ~CryBox() {};
 };
 
 /**

@@ -52,6 +52,7 @@ TEST_CASE("Get active user vector") {
 }
 
 TEST_CASE("Handle Send") {
+    msg::MessageDeserializer md;
     SECTION("with connected user") {
         // TODO requires implementation of dummy channel, not sure if worth it though
     }
@@ -59,8 +60,11 @@ TEST_CASE("Handle Send") {
         Server s;
         s.handle_send("bob", msg::Send{"alice", std::vector<uint8_t>{0x60, 0x61, 0x62, 0x63}});
 
-        msg::Recv msg = s.message_queue["alice"].front();
+        std::vector<uint8_t> smsg = s.message_queue["alice"].front();
         s.message_queue["alice"].pop();
+
+        auto dmsg = md(smsg);
+        auto& msg = dynamic_cast<msg::Recv&>(*dmsg.get());
 
         REQUIRE(msg.get_sender() == "bob");
         REQUIRE(msg.get_text() == std::vector<uint8_t>{0x60, 0x61, 0x62, 0x63});
@@ -72,20 +76,26 @@ TEST_CASE("Handle Send") {
         s.handle_send("eve", msg::Send{"alice", std::vector<uint8_t>{0x66, 0x60}});
         s.handle_send("bob", msg::Send{"alice", std::vector<uint8_t>{0x61, 0x61, 0x62, 0x63}});
 
-        msg::Recv msg = s.message_queue["alice"].front();
+        std::vector<uint8_t> smsg = s.message_queue["alice"].front();
         s.message_queue["alice"].pop();
-        REQUIRE(msg.get_sender() == "bob");
-        REQUIRE(msg.get_text() == std::vector<uint8_t>{0x60, 0x61, 0x62, 0x63});
+        auto dmsg = md(smsg);
+        auto& m1 = dynamic_cast<msg::Recv&>(*dmsg.get());
+        REQUIRE(m1.get_sender() == "bob");
+        REQUIRE(m1.get_text() == std::vector<uint8_t>{0x60, 0x61, 0x62, 0x63});
 
-        msg = s.message_queue["alice"].front();
+        smsg = s.message_queue["alice"].front();
         s.message_queue["alice"].pop();
-        REQUIRE(msg.get_sender() == "eve");
-        REQUIRE(msg.get_text() == std::vector<uint8_t>{0x66, 0x60});
+        dmsg = md(smsg);
+        auto& m2 = dynamic_cast<msg::Recv&>(*dmsg.get());
+        REQUIRE(m2.get_sender() == "eve");
+        REQUIRE(m2.get_text() == std::vector<uint8_t>{0x66, 0x60});
 
-        msg = s.message_queue["alice"].front();
+        smsg = s.message_queue["alice"].front();
         s.message_queue["alice"].pop();
-        REQUIRE(msg.get_sender() == "bob");
-        REQUIRE(msg.get_text() == std::vector<uint8_t>{0x61, 0x61, 0x62, 0x63});
+        dmsg = md(smsg);
+        auto& m3 = dynamic_cast<msg::Recv&>(*dmsg.get());
+        REQUIRE(m3.get_sender() == "bob");
+        REQUIRE(m3.get_text() == std::vector<uint8_t>{0x61, 0x61, 0x62, 0x63});
 
         REQUIRE(s.message_queue["alice"].empty());
     }
