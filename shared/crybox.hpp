@@ -97,4 +97,41 @@ public:
         return data;
     }
 };
+
+/**
+ * Sequence Crybox
+ *
+ * Chains crybox calls.
+ */
+class SeqBox : public CryBox {
+#ifdef TESTMODE
+public:
+#endif
+    std::vector<std::unique_ptr<CryBox>> boxes;
+public:
+    SeqBox(CryBox* box) {
+        boxes.emplace_back(box);
+    }
+
+    SeqBox(std::unique_ptr<CryBox> box) {
+        boxes.push_back(std::move(box));
+    }
+
+    SeqBox(std::initializer_list<CryBox*> bxs) {
+        for(auto box : bxs)
+            boxes.emplace_back(box);
+    }
+
+    std::vector<uint8_t> encrypt(std::vector<uint8_t> data) {
+        for(auto it = boxes.begin(); it != boxes.end(); ++it)
+            data = (*it)->encrypt(std::move(data));
+        return data;
+    }
+
+    std::vector<uint8_t> decrypt(std::vector<uint8_t> data) {
+        for(auto it = boxes.rbegin(); it != boxes.rend(); ++it)
+            data = (*it)->decrypt(std::move(data));
+        return data;
+    }
+};
 #endif

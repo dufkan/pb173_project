@@ -101,3 +101,60 @@ TEST_CASE("MACBox"){
         REQUIRE_THROWS(box.decrypt(macd));
     }
 }
+
+TEST_CASE("SeqBox single") {
+    std::array<uint8_t, 32> K;
+    std::for_each(K.begin(), K.end(), [](uint8_t x){ return x * x + 1; });
+    SeqBox box = std::unique_ptr<CryBox>{new AESBox{K}};
+    AESBox abox{K};
+
+    SECTION("empty") {
+        std::vector<uint8_t> data = {};
+        std::vector<uint8_t> enc = box.encrypt(data);
+        REQUIRE(enc == abox.encrypt(data));
+        REQUIRE(box.decrypt(enc) == abox.decrypt(enc));
+    }
+    SECTION("some") {
+        std::vector<uint8_t> data = {'T', 'e', 's', 't', ' ', 0x00, 0x01, 0x02, 0x03, 0x04};
+        std::vector<uint8_t> enc = box.encrypt(data);
+        REQUIRE(enc == abox.encrypt(data));
+        REQUIRE(box.decrypt(enc) == abox.decrypt(enc));
+    }
+    SECTION("a lot") {
+        std::vector<uint8_t> data;
+        data.resize(1024 * 1024);
+        std::iota(data.begin(), data.end(), 0);
+        std::vector<uint8_t> enc = box.encrypt(data);
+        REQUIRE(enc == abox.encrypt(data));
+        REQUIRE(box.decrypt(enc) == abox.decrypt(enc));
+    }
+}
+
+TEST_CASE("SeqBox multiple") {
+    std::array<uint8_t, 32> K;
+    std::for_each(K.begin(), K.end(), [](uint8_t x){ return x * x + 1; });
+    SeqBox box = {new IdBox, new MACBox{K}, new AESBox{K}};
+    AESBox abox{K};
+    MACBox mbox{K};
+
+    SECTION("empty") {
+        std::vector<uint8_t> data = {};
+        std::vector<uint8_t> enc = box.encrypt(data);
+        REQUIRE(enc == abox.encrypt(mbox.encrypt(data)));
+        REQUIRE(box.decrypt(enc) == mbox.decrypt(abox.decrypt(enc)));
+    }
+    SECTION("some") {
+        std::vector<uint8_t> data = {'T', 'e', 's', 't', ' ', 0x00, 0x01, 0x02, 0x03, 0x04};
+        std::vector<uint8_t> enc = box.encrypt(data);
+        REQUIRE(enc == abox.encrypt(mbox.encrypt(data)));
+        REQUIRE(box.decrypt(enc) == mbox.decrypt(abox.decrypt(enc)));
+    }
+    SECTION("a lot") {
+        std::vector<uint8_t> data;
+        data.resize(1024 * 1024);
+        std::iota(data.begin(), data.end(), 0);
+        std::vector<uint8_t> enc = box.encrypt(data);
+        REQUIRE(enc == abox.encrypt(mbox.encrypt(data)));
+        REQUIRE(box.decrypt(enc) == mbox.decrypt(abox.decrypt(enc)));
+    }
+}
