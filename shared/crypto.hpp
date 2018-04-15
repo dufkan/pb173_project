@@ -478,23 +478,25 @@ std::array<uint8_t,32> cry::create_symmetric_key(std::vector<uint8_t> first, std
 
 template <typename C>
 std::array<uint8_t, 32> cry::mac_data(const C& data, std::array<uint8_t, 32> key) {
-    const mbedtls_cipher_info_t *cipher_info;
-    cipher_info = mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_256_CBC);
-    std::array<uint8_t, 32> output;
+    const mbedtls_cipher_info_t* cipher_info = mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_256_ECB);
+    std::array<uint8_t, 32> output{};
 
-    mbedtls_cipher_cmac(cipher_info, key.data(), key.size(), data.data(), data.size(), output.data());
-    return output; 
-} 
+    mbedtls_cipher_context_t ctx[1];
+    mbedtls_cipher_init(ctx);
+    mbedtls_cipher_setup(ctx, cipher_info);
+    mbedtls_cipher_cmac_starts(ctx, key.data(), 256);
+    if(data.size() != 0)
+        mbedtls_cipher_cmac_update(ctx, data.data(), data.size());
+    mbedtls_cipher_cmac_finish(ctx, output.data());
+    return output;
+}
 
 
 
 template <typename C>
 bool cry::check_mac(const C& data, std::array<uint8_t, 32> key, std::array<uint8_t, 32> mac_to_check) {
     std::array<uint8_t, 32> act_mac = cry::mac_data(data, key);
-    return !(act_mac == mac_to_check);
+    return act_mac == mac_to_check;
 }
-
-
-
 
 #endif
