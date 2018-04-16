@@ -27,7 +27,7 @@ enum class MessageType : uint8_t {
     GetOnline,
     RetOnline,
     ReqAlive,
-    RespAlive
+    RespAlive,
 };
 
 /**
@@ -434,7 +434,7 @@ public:
     }
 
 
-    std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data){
+    static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data){
         Decoder message{data};
         message.get_u8();
         std::set<std::string> online;
@@ -455,16 +455,16 @@ public:
     bool is_online(const std::string& name) const {
         auto it = on_users.find(name);
         return (it != on_users.end());
-    }    
+    }
 
 
     bool operator==(const RetOnline& ret) const {
         return (on_users == ret.on_users);
-    }    
+    }
  };
 
 
-class ReqAlive : public Message{
+class ReqAlive : public Message {
 #ifdef TESTMODE
 public:
 #endif
@@ -481,7 +481,7 @@ public:
     }
     
 
-    std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data){
+    static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data){
         /*Decoder message{data};
         message.get_u8(); */
         return std::make_unique<ReqAlive>();
@@ -500,7 +500,7 @@ public:
         return message.move();
     }
 
-    std::unique_ptr<Message> deserialaze(const std::vector<uint8_t>& data){
+    static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data){
         return std::make_unique<RespAlive>();
     }
 
@@ -521,6 +521,10 @@ public:
         deserialize_map.insert({MessageType::ClientResp, &ClientResp::deserialize});
         deserialize_map.insert({MessageType::Send, &Send::deserialize});
         deserialize_map.insert({MessageType::Recv, &Recv::deserialize});
+        deserialize_map.insert({MessageType::GetOnline, &GetOnline::deserialize});
+        deserialize_map.insert({MessageType::RetOnline, &RetOnline::deserialize});
+        deserialize_map.insert({MessageType::ReqAlive, &ReqAlive::deserialize});
+        deserialize_map.insert({MessageType::RespAlive, &RespAlive::deserialize});
     }
 
     /**

@@ -190,7 +190,7 @@ std::string Client::load_text_message() {
 	std::string stext;
 	std::cout << "Text of the message: ";
 	std::getline(std::cin,stext);
-	return std::move(stext);
+	return stext;
     }
 
 
@@ -325,7 +325,7 @@ void Client::initiate_connection(Channel& chan){
     cresp.encrypt(K);
     chan.send(cresp);
 
-    chan.set_crybox(std::unique_ptr<CryBox>{new AESBox{K}});
+    chan.set_crybox(std::unique_ptr<CryBox>{new SeqBox{new AESBox{K}, new MACBox{K}}});
     std::cout << "I am in!" << std::endl;
 }
 

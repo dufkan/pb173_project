@@ -15,6 +15,7 @@
 #include <chrono>
 #include <mutex>
 #include <iterator>
+#include <set>
 
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
@@ -121,6 +122,14 @@ public:
     void handle_send(const std::string& pseudonym, msg::Send msg);
 
     /**
+     * GetOnline Message handler
+     *
+     * @param pseudonym - Originator of the message
+     * @param msg - The message
+     */
+    void handle_get_online(const std::string& pseudonym, msg::GetOnline msg);
+
+    /**
      * Message error handler
      *
      * Invoked if the message was not handled by any other handler.
@@ -134,7 +143,7 @@ public:
      *
      * @return Vector of pseudonyms of connected users
      */
-    std::vector<std::string> get_connected_users();
+    std::set<std::string> get_connected_users();
 };
 
 void Server::prepare_key() {
@@ -237,7 +246,7 @@ void Server::connection_handler() {
                 continue; // TODO exception
             }
 
-            chan.set_crybox(std::unique_ptr<CryBox>{new AESBox{K}});
+            chan.set_crybox(std::unique_ptr<CryBox>{new SeqBox{new AESBox{K}, new MACBox{K}}});
 
             if(local_key.empty() && !client_key.empty())
                 store_client_key(pseudonym, client_key);
@@ -300,11 +309,10 @@ void Server::send_to(const std::string& pseudonym, const std::vector<uint8_t>& m
     }
 }
 
-std::vector<std::string> Server::get_connected_users() {
-    std::vector<std::string> connected;
-    connected.reserve(connections.size());
+std::set<std::string> Server::get_connected_users() {
+    std::set<std::string> connected;
     for(auto& c : connections) {
-        connected.push_back(c.first);
+        connected.insert(c.first);
     }
     return connected;
 }
@@ -324,8 +332,16 @@ void Server::handle_message(const std::string& pseudonym, std::vector<uint8_t> m
         case msg::MessageType::Send:
             handle_send(pseudonym, dynamic_cast<msg::Send&>(*deserialized_msg.get()));
             break;
+        case msg::MessageType::GetOnline:
+            handle_get_online(pseudonym, dynamic_cast<msg::GetOnline&>(*deserialized_msg.get()));
+            break;
         default:
             handle_error(*deserialized_msg.get());
     }
+}
+
+void Server::handle_get_online(const std::string& pseudonym, msg::GetOnline msg) {
+    msg::RetOnline res{get_connected_users()};
+    send_to(pseudonym, res.serialize());
 }
 #endif
