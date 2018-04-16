@@ -48,7 +48,7 @@ TEST_CASE("Get active user vector") {
     s.connections.insert(std::make_pair(std::string{"eve"}, Channel{std::move(sock)}));
     s.connections.insert(std::make_pair(std::string{"alice"}, Channel{std::move(sock)}));
     s.connections.insert(std::make_pair(std::string{"bob"}, Channel{std::move(sock)}));
-    REQUIRE(s.get_connected_users() == std::vector<std::string>{"alice", "bob", "eve"});
+    REQUIRE(s.get_connected_users() == std::set<std::string>{"alice", "bob", "eve"});
 }
 
 TEST_CASE("Handle Send") {

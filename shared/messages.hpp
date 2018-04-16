@@ -51,9 +51,6 @@ class Message {
 */
 public:
     virtual ~Message() {}
-    
-   
-
 };
 
 class ClientInit : public Message {
@@ -61,18 +58,18 @@ class ClientInit : public Message {
 public:
 #endif
     std::string pseudonym;
-    
+
     std::array<uint8_t, 32> Rc;
     std::vector<uint8_t> key;
 
     std::vector<uint8_t> eRc;
     std::vector<uint8_t> epayload;
 
-    std::array<uint8_t,32> mac;    
+    std::array<uint8_t,32> mac;
 
     ClientInit(std::vector<uint8_t> eRc, std::vector<uint8_t> epayload, std::array<uint8_t,32> mac = {}):
         eRc(std::move(eRc)), epayload(std::move(epayload)), mac(mac) {}
-     
+
 public:
     ClientInit(std::string pseudonym, std::array<uint8_t, 32> Rc, std::vector<uint8_t> key, std::array<uint8_t,32> mac = {}):
         pseudonym(std::move(pseudonym)), Rc(std::move(Rc)), key(std::move(key)), mac(mac) {}
@@ -118,7 +115,7 @@ public:
         std::array<uint8_t,32> mmac = msg.get_arr<32>();
         std::vector<uint8_t> eRc = msg.get_vec(512);
         std::vector<uint8_t> epayload = msg.get_vec();
-        
+
         return std::unique_ptr<ClientInit>(new ClientInit{eRc, epayload, mmac});
     }
 
@@ -147,16 +144,15 @@ public:
 
     std::array<uint8_t,32> mac;
 
-      
+
     ServerResp(std::vector<uint8_t> eRs, std::vector<uint8_t> eRc, std::array<uint8_t,32> mac = {}):
         eRs(std::move(eRs)), eRc(std::move(eRc)), mac(mac) {}
-    
 
 public:
     ServerResp(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> Rc, std::array<uint8_t,32> mac={}):
         Rs(std::move(Rs)), Rc(std::move(Rc)), mac(mac) {}
 
-    
+
     void encrypt(cry::RSAKey& client_pub) {
         eRs = cry::encrypt_rsa(Rs, client_pub);
         eRc = cry::encrypt_aes(Rc, {}, Rs);
@@ -479,7 +475,7 @@ public:
         message.put(value);
         return message.move();
     }
-    
+
 
     static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data){
         /*Decoder message{data};
