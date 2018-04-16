@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <vector>
 #include <string>
+#include <set>
 #include <functional>
 
 #include "crypto.hpp"
@@ -49,12 +50,7 @@ class Message {
 public:
     virtual ~Message() {}
     
-  /*  std::array<uint8_t, 32> get_mac() {
-        return mac;
-    }
-
-    bool check_mac() {}
-  */  
+   
 
 };
 
@@ -391,8 +387,79 @@ class ReqPrekey : public Message {};
 class RetPrekey : public Message {};
 class AskPrekey : public Message {};
 class UploadPrekey : public Message {};
-class GetOnline : public Message{};
-class RetOnline : public Message{};
+
+
+/**
+ * Get online message - from user to server
+ */
+class GetOnline : public Message{
+public:
+
+    std::vector<uint8_t> serialize() const {
+        Encoder message;
+        message.put(static_cast<uint8_t>(MessageType::GetOnline));
+        return message.move();    
+    }
+
+    static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
+        Decoder message{data};
+        return std::make_unique<GetOnline>();
+    }
+};
+
+
+/**
+ * Return online users - from server to user
+ */
+class RetOnline : public Message{
+#ifdef TESTMODE
+public:
+#endif
+    std::set<std::string> on_users;
+public:
+    
+    RetOnline(std::set<std::string> on_users) : on_users(on_users) {}
+
+    std::vector<uint8_t> serialize() {
+        Encoder message;
+        message.put(static_cast<uint8_t>(MessageType::RetOnline));
+        message.put(static_cast<uint16_t>(on_users.size()));
+        for (const std::string& onus : on_users) {
+            message.put(static_cast<uint8_t>(onus.size()));
+            message.put(onus);
+        }
+        return message.move();
+    }
+
+
+    std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data){
+        Decoder message{data};
+        message.get_u8();
+        std::set<std::string> online;
+        int onsize = static_cast<int>(message.get_u16());
+        for (int i = 0; i < onsize; i++) {
+            uint8_t namelen = message.get_u8();
+            online.insert(message.get_str(namelen));
+        }
+        return std::make_unique<RetOnline>(online);
+    }
+
+
+    std::set<std::string> get_users() {
+        return on_users;
+    }
+
+
+    bool is_online(const std::string& name) const {
+        auto it = on_users.find(name);
+        return (it != on_users.end());
+    }    
+
+
+    bool operator==(const RetOnline& ret) const {
+        return (on_users == ret.on_users);
+    }    
+ };
 
 
 /**

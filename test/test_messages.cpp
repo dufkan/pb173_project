@@ -117,3 +117,40 @@ TEST_CASE("Message Recv") {
 
     CHECK(recv_des == recv);
 }
+
+
+
+TEST_CASE("Message GetOnline") {
+    auto geto = msg::GetOnline{};
+    std::vector<uint8_t> geto_ser = geto.serialize();
+    REQUIRE(msg::type(geto_ser) == msg::MessageType::GetOnline);
+    
+    std::unique_ptr<msg::Message> msg_geto = msg::GetOnline::deserialize(geto_ser);
+    msg::GetOnline& geto_des = dynamic_cast<msg::GetOnline&>(*msg_geto.get());
+
+    //CHECK(geto_des == geto);
+}
+
+
+TEST_CASE("Message RetOline") {
+    std::set<std::string> online;
+    online.insert("Anna");
+    online.insert("Alice");
+    online.insert("Bob");
+
+    auto reto = msg::RetOnline(online);
+    REQUIRE((reto.get_users()) == online);
+    REQUIRE(reto.is_online("Anna"));
+    REQUIRE(reto.is_online("Alice"));
+    REQUIRE(reto.is_online("Bob"));
+    REQUIRE(!reto.is_online("Martin"));
+
+    std::vector<uint8_t> reto_ser = reto.serialize();
+
+    REQUIRE(msg::type(reto_ser) == msg::MessageType::RetOnline);
+    
+    std::unique_ptr<msg::Message> msg_reto = reto.deserialize(reto_ser);
+    msg::RetOnline& reto_des = dynamic_cast<msg::RetOnline&>(*msg_reto.get());
+
+    CHECK(reto == reto_des);
+}
