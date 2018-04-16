@@ -25,7 +25,9 @@ enum class MessageType : uint8_t {
     AskPrekey,
     UploadPrekey,
     GetOnline,
-    RetOnline
+    RetOnline,
+    ReqAlive,
+    RespAlive
 };
 
 /**
@@ -402,7 +404,7 @@ public:
     }
 
     static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
-        Decoder message{data};
+        //Decoder message{data};
         return std::make_unique<GetOnline>();
     }
 };
@@ -460,6 +462,49 @@ public:
         return (on_users == ret.on_users);
     }    
  };
+
+
+class ReqAlive : public Message{
+#ifdef TESTMODE
+public:
+#endif
+    std::vector<uint8_t> value;
+
+public:
+    ReqAlive() : value(cry::get_random_data(32)) {}
+
+    std::vector<uint8_t> serialize() {
+        Encoder message;
+        message.put(static_cast<uint8_t>(MessageType::ReqAlive));
+        message.put(value);
+        return message.move();
+    }
+    
+
+    std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data){
+        /*Decoder message{data};
+        message.get_u8(); */
+        return std::make_unique<ReqAlive>();
+    }
+};
+
+
+class RespAlive : public Message{
+#ifdef TESTMODE
+public:
+#endif
+public:
+    std::vector<uint8_t> serialize() {
+        Encoder message;
+        message.put(static_cast<uint8_t>(MessageType::RespAlive));
+        return message.move();
+    }
+
+    std::unique_ptr<Message> deserialaze(const std::vector<uint8_t>& data){
+        return std::make_unique<RespAlive>();
+    }
+
+};
 
 
 /**
