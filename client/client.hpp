@@ -295,8 +295,15 @@ void Client::initiate_connection(Channel& chan){
     cry::random_data(Rc);
 
     cry::RSAKey ckey;
-    cry::generate_rsa_keys(ckey, ckey);
-
+    
+    try {
+        std::vector<uint8_t> file_ckey = util::read_file(pseudonym);
+        ckey.import(file_ckey);    
+    } catch (std::ios_base::failure& e) {
+        cry::generate_rsa_keys(ckey, ckey);
+        util::write_file(pseudonym,ckey.export_all(),false);
+    }
+   
     msg::ClientInit init{pseudonym, Rc, ckey.export_pub()};
     init.encrypt(spub);
     chan.send(init);
