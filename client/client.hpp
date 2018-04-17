@@ -469,6 +469,8 @@ void Client::handle_message(const std::vector<uint8_t>& data) {
                 std::cout << std::flush;
             }
             break;
+        default:
+            break;
     }
 }
 

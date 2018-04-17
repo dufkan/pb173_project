@@ -399,7 +399,7 @@ public:
         return message.move();    
     }
 
-    static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
+    static std::unique_ptr<Message> deserialize([[maybe_unused]] const std::vector<uint8_t>& data) {
         //Decoder message{data};
         return std::make_unique<GetOnline>();
     }
@@ -477,7 +477,7 @@ public:
     }
 
 
-    static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data){
+    static std::unique_ptr<Message> deserialize([[maybe_unused]] const std::vector<uint8_t>& data){
         /*Decoder message{data};
         message.get_u8(); */
         return std::make_unique<ReqAlive>();
@@ -496,7 +496,7 @@ public:
         return message.move();
     }
 
-    static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data){
+    static std::unique_ptr<Message> deserialize([[maybe_unused]] const std::vector<uint8_t>& data){
         return std::make_unique<RespAlive>();
     }
 

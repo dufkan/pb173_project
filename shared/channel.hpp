@@ -113,7 +113,7 @@ public:
     }
 
     std::chrono::seconds silence_duration() {
-        return std::chrono::duration_cast<std::chrono::seconds>(last - std::chrono::steady_clock::now());
+        return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - last);
     }
 };
 

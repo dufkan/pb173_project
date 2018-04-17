@@ -280,6 +280,13 @@ void Server::run() {
             }
             else if(c.second.silence_duration().count() > 30) {
                 // poke client with a stick
+                msg::ReqAlive stick;
+                try {
+                    c.second.send(stick.serialize()); // poke
+                }
+                catch(ChannelException& e) {
+                    dc_list.push_back(c.first);
+                }
             }
         }
         release_connections(dc_list);
@@ -335,6 +342,9 @@ void Server::handle_message(const std::string& pseudonym, std::vector<uint8_t> m
             break;
         case msg::MessageType::GetOnline:
             handle_get_online(pseudonym, dynamic_cast<msg::GetOnline&>(*deserialized_msg.get()));
+            break;
+        case msg::MessageType::RespAlive:
+            // client screamed, he is alive
             break;
         default:
             handle_error(*deserialized_msg.get());
