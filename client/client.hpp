@@ -5,6 +5,11 @@
 #include <string>
 #include <iostream>
 #include <map>
+#include <optional>
+#include <thread>
+#include <chrono>
+#include <mutex>
+#include <cstdio>
 
 #include "asio.hpp"
 #include "../shared/messages.hpp"
@@ -19,6 +24,8 @@ public:
 #endif
     std::map<std::string, std::array<uint8_t,32>> contacts;
     std::string pseudonym = "noone";
+    std::optional<Channel> chan;
+    std::mutex output_mutex;
 
     msg::MessageDeserializer message_deserializer;
 
@@ -29,16 +36,10 @@ public:
     void add_friend();
 
 
-    void handle_message_type(const std::vector<uint8_t>& data) {
-        msg::MessageType mt = msg::type(data);
-        switch (mt) {
-            case msg::MessageType::Recv : ui_recv_message(data);
-                    break;
-            case msg::MessageType::RetOnline : ret_online_message(data);
-                    break;
-            default : break;
-        }
-    }
+    /**
+     * Handle incomming message
+     */
+    void handle_message(const std::vector<uint8_t>& data);
 
     /**
      * Create message for getting online users
@@ -91,7 +92,7 @@ public:
      *
      * @return the text
      */
-    std::string load_text_message(); 
+    std::string load_text_message();
 
 
     /**
@@ -126,6 +127,11 @@ public:
      *
      */
     void ui_recv_message(std::vector<uint8_t> msg);
+
+    /**
+     * Thread for receiving messages
+     */
+    void recv_thread();
 
 public:
     Client() = default;
@@ -179,7 +185,7 @@ public:
      *
      * @param chan - Channel
      */
-    void initiate_connection(Channel& chan);
+    void initiate_connection();
 
 
     void print_menu() {
@@ -358,63 +364,45 @@ void Client::run() {
     tcp::resolver resolver{io_service};
     asio::connect(sock, resolver.resolve({"127.0.0.1", "1337"}));
 
-    Channel chan{std::move(sock)};
-    initiate_connection(chan);
-    
-    char what;
+    chan = Channel{std::move(sock)};
+    initiate_connection();
+
     std::vector<uint8_t> recv_byte;
     print_menu();
-    
+    auto t = std::thread(&Client::recv_thread, this);
     for(;;) {
-        std::cout << ">" << std::flush;            
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::lock_guard<std::mutex> lock{output_mutex};
+        std::cout << "> " << std::flush;
+        char what;
         std::cin >> what;
+        std::string p, t;
         switch(what) {
-            case 'a' : {
-                    add_friend();
-                    break;}
-            case 'o' : {
-                    chan.send(get_online_message());
-                    ret_online_message(chan.recv());
-                    break;}
-            case 'd' : {
-                    chan.send(send_msg_byte(pseudonym, "Ahoj, testuju zpravy"));
-                    handle_message_type(chan.recv());
-                    break;}
-            case 'z' : {
-                    auto [p, t] = ui_get_param_msg();
-                    chan.send(send_msg_byte(pseudonym, t));
-                    handle_message_type(chan.recv());
-                    break;}
-            case 's' : {
-                    auto [p, t] = ui_get_param_msg();
-                    chan.send(send_msg_byte(p, t));
-                    break;}
-           /* case 'v' : {
-                    recv_byte = chan.try_recv();
-                    if (recv_byte.size() != 0) {
-                        handle_message_type(recv_byte);
-                    } 
-                    break;}*/
-            case 'w' : {
-                    handle_message_type(chan.recv());
-                    break;}
+            case 'a':
+                add_friend();
+                break;
+            case 'o':
+                chan->send(get_online_message());
+                break;
+            case 'd':
+                chan->send(send_msg_byte(pseudonym, "Ahoj, testuju zpravy"));
+                break;
+            case 'z':
+                std::tie(p, t) = ui_get_param_msg();
+                chan->send(send_msg_byte(pseudonym, t));
+                break;
+            case 's':
+                std::tie(p, t) = ui_get_param_msg();
+                chan->send(send_msg_byte(p, t));
+                break;
         }
-        /*recv_byte = chan.try_recv();
-        if (recv_byte.size() != 0) {
-            handle_message_type(recv_byte);
-        } 
-        else {
-            chan.send(send_msg_byte(pseudonym, "Ahoj, testuju zpravy v nejlepsim IM!"));
-            auto [p, t] = handle_recv_msg(chan.recv());
-            std::cout << p << ": " << t << std::endl;
-            //sleep(1500);
-        }*/    
     }
+    t.join();
 }
 
 
 
-void Client::initiate_connection(Channel& chan){ 
+void Client::initiate_connection(){
     std::vector<uint8_t> file_key = util::read_file("PUBSECRET");
     cry::RSAKey spub;
     spub.import(file_key);
@@ -434,9 +422,9 @@ void Client::initiate_connection(Channel& chan){
    
     msg::ClientInit init{pseudonym, Rc, ckey.export_pub()};
     init.encrypt(spub);
-    chan.send(init);
+    chan->send(init);
 
-    auto uniq_sresp = message_deserializer(chan.recv());
+    auto uniq_sresp = message_deserializer(chan->recv());
     auto sresp = dynamic_cast<msg::ServerResp&>(*uniq_sresp.get());
     sresp.decrypt(ckey);
     if (!sresp.check_mac()){
@@ -458,10 +446,36 @@ void Client::initiate_connection(Channel& chan){
 
     msg::ClientResp cresp{Rs};
     cresp.encrypt(K);
-    chan.send(cresp);
+    chan->send(cresp);
 
-    chan.set_crybox(std::unique_ptr<CryBox>{new SeqBox{new AESBox{K}, new MACBox{K}}});
+    chan->set_crybox(std::unique_ptr<CryBox>{new SeqBox{new AESBox{K}, new MACBox{K}}});
     std::cout << "I am in!" << std::endl;
 }
 
+void Client::handle_message(const std::vector<uint8_t>& data) {
+    msg::MessageType mt = msg::type(data);
+    switch (mt) {
+        case msg::MessageType::Recv:
+            {
+                std::lock_guard<std::mutex> lock{output_mutex};
+                ui_recv_message(data);
+                std::cout << std::flush;
+            }
+            break;
+        case msg::MessageType::RetOnline:
+            {
+                std::lock_guard<std::mutex> lock{output_mutex};
+                ret_online_message(data);
+                std::cout << std::flush;
+            }
+            break;
+    }
+}
+
+void Client::recv_thread() {
+    for(;;) {
+        std::vector<uint8_t> msg = chan->recv();
+        handle_message(std::move(msg));
+    }
+}
 #endif
