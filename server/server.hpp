@@ -318,9 +318,10 @@ std::set<std::string> Server::get_connected_users() {
 }
 
 void Server::handle_send(const std::string& pseudonym, msg::Send msg) {
-    msg::Recv recv{pseudonym, msg.get_text()};
+    msg::Recv recv{pseudonym, msg.get_text()}; 
     send_to(msg.get_receiver(), recv.serialize());
 }
+
 
 void Server::handle_error(msg::Message msg) {
     std::cerr << "Got a message I cannot handle." << std::endl;

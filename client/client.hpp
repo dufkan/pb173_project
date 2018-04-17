@@ -22,6 +22,38 @@ public:
 
     msg::MessageDeserializer message_deserializer;
 
+    /**
+     * Adds a client to contacts, name of client is from std::cin
+     * Function for testing only, only one key for everyone
+     */
+    void add_friend();
+
+
+    void handle_message_type(const std::vector<uint8_t>& data) {
+        msg::MessageType mt = msg::type(data);
+        switch (mt) {
+            case msg::MessageType::Recv : ui_recv_message(data);
+                    break;
+            case msg::MessageType::RetOnline : ret_online_message(data);
+                    break;
+            default : break;
+        }
+    }
+
+    /**
+     * Create message for getting online users
+     *
+     */
+    std::vector<uint8_t> get_online_message();
+
+
+    /**
+     * Handle with message with online users
+     * ui, print them on std::cout
+     */
+    void ret_online_message(std::vector<uint8_t> data);
+    
+
      /**
      * Create message Send from params and encrypt the text with AES-256 recv_key
      *
@@ -50,7 +82,7 @@ public:
      * @param recv_name Pseudonym of receiver
      * @return true if the pseudonym is saved in conntacts
      */
-    bool load_recv(std::string recv_name); 
+    bool load_recv(std::string& recv_name); 
 
 
 
@@ -149,8 +181,37 @@ public:
      */
     void initiate_connection(Channel& chan);
 
+
+    void print_menu() {
+        using std::cout;
+        cout << "a - add contact" << std::endl;
+        cout << "o - get online users" << std::endl;
+        cout << "z - send a message to (a user) me" << std::endl;
+        cout << "d - send me a dafualt message" << std::endl;
+        cout << "s - send to another user a message" << std::endl;
+        cout << "v - check is there is a message for me" << std::endl;
+        cout << "w - wait for a message" << std::endl;
+    }
+
 }; //Client
 
+
+std::vector<uint8_t> Client::get_online_message(){
+    msg::GetOnline m;
+    return m.serialize();
+}
+
+
+void Client::ret_online_message(std::vector<uint8_t> data) {
+    std::unique_ptr<msg::Message> des = msg::RetOnline::deserialize(data);
+    msg::RetOnline& msg_on = dynamic_cast<msg::RetOnline&>(*des.get());
+
+    std::set<std::string> oni = msg_on.get_users();
+    std::cout << "Online users (" << oni.size() <<"):" <<std::endl;
+    for (const std::string& on : oni) {
+        std::cout << on << std::endl;
+    } 
+}
 
 
 
@@ -177,9 +238,11 @@ std::vector<uint8_t> Client::send_msg_byte(std::string recv_name, std::string te
 }
 
 
-bool Client::load_recv(std::string recv_name) {
-	std::cout << "Reciever - pseudonym: ";
-	std::getline(std::cin,recv_name);
+bool Client::load_recv(std::string& recv_name) {
+	std::cout << "Pseudonym: ";
+    std::getline(std::cin,recv_name);
+    if(recv_name.size() < 2)
+	    std::getline(std::cin,recv_name);
 	auto it = contacts.find(recv_name);
 	return (it!=contacts.end());    
 }
@@ -200,6 +263,7 @@ std::pair<std::string, std::string> Client::ui_get_param_msg() {
 	    /* Load pseudonym of receiver which is not saved in conntacts
            Does the user want to load the key and save it? */
 	}
+	//std::cout << "Get: "<<recv_name <<std::endl;
 	return std::make_pair(recv_name, load_text_message());
 }
 
@@ -266,6 +330,25 @@ void Client::write_key(std::vector<uint8_t>& key){
 }
 
 
+void Client::add_friend() {
+         std::string name;
+         bool okaa = load_recv(name);
+         std::array<uint8_t, 32> key = {{0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe, 0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81, 0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7, 0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4}};
+        /*std::string fname = "friend_" + name; 
+        try {
+            std::vector<uint8_t> file_ckey = util::read_file(fname);
+            copy(file_ckey.begin(),file_ckey.begin()+32,key.begin());
+    
+        } catch (std::ios_base::failure& e) {
+            cry::generate_rsa_keys(ckey, ckey);
+            util::write_file(pseudonym,ckey.export_all(),false);
+        }*/
+
+        add_contact(name,key);     
+    }
+
+
+
 
 void Client::run() {
     using asio::ip::tcp;
@@ -277,10 +360,55 @@ void Client::run() {
 
     Channel chan{std::move(sock)};
     initiate_connection(chan);
+    
+    char what;
+    std::vector<uint8_t> recv_byte;
+    print_menu();
+    
     for(;;) {
-        chan.send(send_msg_byte(pseudonym, "Ahoj, testuju zpravy v nejlepsim IM!"));
-        auto [p, t] = handle_recv_msg(chan.recv());
-        std::cout << p << ": " << t << std::endl;
+        std::cout << ">" << std::flush;            
+        std::cin >> what;
+        switch(what) {
+            case 'a' : {
+                    add_friend();
+                    break;}
+            case 'o' : {
+                    chan.send(get_online_message());
+                    ret_online_message(chan.recv());
+                    break;}
+            case 'd' : {
+                    chan.send(send_msg_byte(pseudonym, "Ahoj, testuju zpravy"));
+                    handle_message_type(chan.recv());
+                    break;}
+            case 'z' : {
+                    auto [p, t] = ui_get_param_msg();
+                    chan.send(send_msg_byte(pseudonym, t));
+                    handle_message_type(chan.recv());
+                    break;}
+            case 's' : {
+                    auto [p, t] = ui_get_param_msg();
+                    chan.send(send_msg_byte(p, t));
+                    break;}
+           /* case 'v' : {
+                    recv_byte = chan.try_recv();
+                    if (recv_byte.size() != 0) {
+                        handle_message_type(recv_byte);
+                    } 
+                    break;}*/
+            case 'w' : {
+                    handle_message_type(chan.recv());
+                    break;}
+        }
+        /*recv_byte = chan.try_recv();
+        if (recv_byte.size() != 0) {
+            handle_message_type(recv_byte);
+        } 
+        else {
+            chan.send(send_msg_byte(pseudonym, "Ahoj, testuju zpravy v nejlepsim IM!"));
+            auto [p, t] = handle_recv_msg(chan.recv());
+            std::cout << p << ": " << t << std::endl;
+            //sleep(1500);
+        }*/    
     }
 }
 
