@@ -23,14 +23,17 @@ class Client {
 public:
 #endif
     std::map<std::string, std::array<uint8_t,32>> contacts;
-    std::string pseudonym = "noone";
+    std::string pseudonym;
     std::optional<Channel> chan;
     std::mutex output_mutex;
+    std::istream& in;
+    std::ostream& out;
+    std::ostream& err;
 
     msg::MessageDeserializer message_deserializer;
 
     /**
-     * Adds a client to contacts, name of client is from std::cin
+     * Adds a client to contacts, name of client is from in
      * Function for testing only, only one key for everyone
      */
     void add_friend();
@@ -50,7 +53,7 @@ public:
 
     /**
      * Handle with message with online users
-     * ui, print them on std::cout
+     * ui, print them on out
      */
     void ret_online_message(std::vector<uint8_t> data);
      
@@ -139,8 +142,8 @@ public:
     void recv_thread();
 
 public:
-    Client() = default;
-    Client(std::string pseudonym): pseudonym(std::move(pseudonym)) {}
+    Client(std::string pseudonym = "noone", std::istream& in = std::cin, std::ostream& out = std::cout, std::ostream& err = std::cerr)
+        : pseudonym(std::move(pseudonym)), in(in), out(out), err(err) {}
 
     /**
      * Save psuedonym and key to cantacts
@@ -194,15 +197,13 @@ public:
 
 
     void print_menu() {
-        using std::cout;
-        cout << "a - add contact" << std::endl;
-        cout << "o - get online users" << std::endl;
-        cout << "z - send a message to (a user) me" << std::endl;
-        cout << "d - send me a dafualt message" << std::endl;
-        cout << "s - send to another user a message" << std::endl;
-        //cout << "v - check is there is a message for me" << std::endl;
-        cout << "w - wait for a message" << std::endl;
-        cout << "q - disconnect" << std::endl;
+        out << "a - add contact" << std::endl;
+        out << "o - get online users" << std::endl;
+        out << "z - send a message to (a user) me" << std::endl;
+        out << "d - send me a dafualt message" << std::endl;
+        out << "s - send to another user a message" << std::endl;
+        out << "w - wait for a message" << std::endl;
+        out << "q - disconnect" << std::endl;
     }
 
 }; //Client
@@ -219,9 +220,9 @@ void Client::ret_online_message(std::vector<uint8_t> data) {
     msg::RetOnline& msg_on = dynamic_cast<msg::RetOnline&>(*des.get());
 
     std::set<std::string> oni = msg_on.get_users();
-    std::cout << "Online users (" << oni.size() <<"):" <<std::endl;
+    out << "Online users (" << oni.size() <<"):" <<std::endl;
     for (const std::string& on : oni) {
-        std::cout << on << std::endl;
+        out << on << std::endl;
     } 
 }
 
@@ -256,10 +257,10 @@ std::vector<uint8_t> Client::send_msg_byte(std::string recv_name, std::string te
 
 
 bool Client::load_recv(std::string& recv_name) {
-	std::cout << "Pseudonym: ";
-    std::getline(std::cin,recv_name);
+	out << "Pseudonym: ";
+    std::getline(in,recv_name);
     if(recv_name.size() < 2)
-	    std::getline(std::cin,recv_name);
+	    std::getline(in,recv_name);
 	auto it = contacts.find(recv_name);
 	return (it!=contacts.end());    
 }
@@ -268,8 +269,8 @@ bool Client::load_recv(std::string& recv_name) {
 
 std::string Client::load_text_message() {
 	std::string stext;
-	std::cout << "Text of the message: ";
-	std::getline(std::cin,stext);
+	out << "Text of the message: ";
+	std::getline(in,stext);
 	return stext;
     }
 
@@ -314,8 +315,8 @@ std::pair<std::string,std::string> Client::handle_recv_msg(std::vector<uint8_t> 
 
 void Client::ui_recv_message(std::vector<uint8_t> msg) {
     auto msg_param = handle_recv_msg(msg);
-    std::cout << "Message from: "<< msg_param.first << std::endl;
-    std::cout << "Text: " << msg_param.second << std::endl;
+    out << "Message from: "<< msg_param.first << std::endl;
+    out << "Text: " << msg_param.second << std::endl;
 }
 
 
@@ -383,9 +384,9 @@ void Client::run() {
     for(;;) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         std::lock_guard<std::mutex> lock{output_mutex};
-        std::cout << "> " << std::flush;
+        out << "> " << std::flush;
         char what;
-        std::cin >> what;
+        in >> what;
         std::string p, t;
         switch(what) {
             case 'a':
@@ -408,7 +409,7 @@ void Client::run() {
         }
         if (what == 'q') {
             chan->send(get_logout_message());
-            std::cout << "Disconnecting..." << std::endl;
+            out << "Disconnecting..." << std::endl;
             break;
         }
     }
@@ -444,13 +445,13 @@ void Client::initiate_connection(){
     sresp.decrypt(ckey);
     if (!sresp.check_mac()){
         /*trouble with integrity*/
-        std::cerr << "Problem with integrity, MAC of sresp" << std::endl;
+        err << "Problem with integrity, MAC of sresp" << std::endl;
         return; //TODO handle with excetion
     }
     auto [Rs, verify_Rc] = sresp.get();
 
     if(verify_Rc != Rc) {
-        std::cerr << "There is a BIG problem! 'Rc != Rc'" << std::endl;
+        err << "There is a BIG problem! 'Rc != Rc'" << std::endl;
         return; // TODO handle with exception
     }
 
@@ -464,7 +465,7 @@ void Client::initiate_connection(){
     chan->send(cresp);
 
     chan->set_crybox(std::unique_ptr<CryBox>{new SeqBox{new AESBox{K}, new MACBox{K}}});
-    std::cout << "I am in!" << std::endl;
+    out << "I am in!" << std::endl;
 }
 
 void Client::handle_message(const std::vector<uint8_t>& data) {
@@ -474,14 +475,14 @@ void Client::handle_message(const std::vector<uint8_t>& data) {
             {
                 std::lock_guard<std::mutex> lock{output_mutex};
                 ui_recv_message(data);
-                std::cout << std::flush;
+                out << std::flush;
             }
             break;
         case msg::MessageType::RetOnline:
             {
                 std::lock_guard<std::mutex> lock{output_mutex};
                 ret_online_message(data);
-                std::cout << std::flush;
+                out << std::flush;
             }
             break;
         default:
@@ -495,11 +496,11 @@ void Client::recv_thread() {
         try{
             msg = chan->recv();
         } catch (ChannelException &e){
-            std::cerr << "Stop recv thread" << std::endl;
+            err << "Stop recv thread" << std::endl;
             break;
         }
         handle_message(std::move(msg));
     }
-    std::cout << "Ending recv_thread" << std::endl;
+    out << "Ending recv_thread" << std::endl;
 }
 #endif  

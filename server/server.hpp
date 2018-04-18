@@ -31,6 +31,7 @@ namespace fs = std::experimental::filesystem;
 class Server {
 #ifdef TESTMODE
 public:
+    volatile bool shutdown = false;
 #endif
     std::map<std::string, Channel> connections;
     std::mutex connection_queue_mutex;
@@ -290,8 +291,12 @@ void Server::run() {
             }
         }
         release_connections(dc_list);
+#ifdef TESTMODE
+        if(shutdown)
+            break;
+#endif
     }
-    t.join();
+    //t.join();
 }
 
 void Server::release_connections(const std::vector<std::string>& dcs) {
