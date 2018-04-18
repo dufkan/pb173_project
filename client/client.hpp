@@ -53,7 +53,12 @@ public:
      * ui, print them on std::cout
      */
     void ret_online_message(std::vector<uint8_t> data);
+     
     
+    /**
+     * Create disconnect message
+     */
+    std::vector<uint8_t> get_logout_message(); 
 
      /**
      * Create message Send from params and encrypt the text with AES-256 recv_key
@@ -195,8 +200,9 @@ public:
         cout << "z - send a message to (a user) me" << std::endl;
         cout << "d - send me a dafualt message" << std::endl;
         cout << "s - send to another user a message" << std::endl;
-        cout << "v - check is there is a message for me" << std::endl;
+        //cout << "v - check is there is a message for me" << std::endl;
         cout << "w - wait for a message" << std::endl;
+        cout << "q - disconnect" << std::endl;
     }
 
 }; //Client
@@ -219,6 +225,11 @@ void Client::ret_online_message(std::vector<uint8_t> data) {
     } 
 }
 
+
+std::vector<uint8_t> Client::get_logout_message(){
+    msg::Logout m;
+    return m.serialize();
+}
 
 
 msg::Send Client::create_message(std::string recv_name, std::array<uint8_t, 32> recv_key, std::vector<uint8_t> text) {
@@ -269,7 +280,6 @@ std::pair<std::string, std::string> Client::ui_get_param_msg() {
 	    /* Load pseudonym of receiver which is not saved in conntacts
            Does the user want to load the key and save it? */
 	}
-	//std::cout << "Get: "<<recv_name <<std::endl;
 	return std::make_pair(recv_name, load_text_message());
 }
 
@@ -396,6 +406,11 @@ void Client::run() {
                 chan->send(send_msg_byte(p, t));
                 break;
         }
+        if (what == 'q') {
+            chan->send(get_logout_message());
+            std::cout << "Disconnecting..." << std::endl;
+            break;
+        }
     }
     t.join();
 }
@@ -476,8 +491,15 @@ void Client::handle_message(const std::vector<uint8_t>& data) {
 
 void Client::recv_thread() {
     for(;;) {
-        std::vector<uint8_t> msg = chan->recv();
+        std::vector<uint8_t> msg;
+        try{
+            msg = chan->recv();
+        } catch (ChannelException &e){
+            std::cerr << "Stop recv thread" << std::endl;
+            break;
+        }
         handle_message(std::move(msg));
     }
+    std::cout << "Ending recv_thread" << std::endl;
 }
-#endif
+#endif  

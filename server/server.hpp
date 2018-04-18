@@ -346,6 +346,9 @@ void Server::handle_message(const std::string& pseudonym, std::vector<uint8_t> m
         case msg::MessageType::RespAlive:
             // client screamed, he is alive
             break;
+        case msg::MessageType::Logout:
+            release_connections({pseudonym});
+            break;
         default:
             handle_error(*deserialized_msg.get());
     }

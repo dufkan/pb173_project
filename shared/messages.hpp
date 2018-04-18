@@ -109,9 +109,6 @@ public:
     static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
         Decoder msg{data};
         msg.get_u8();
-
-        //std::vector<uint8_t> mmac =  msg.get_vec(32);
-        //std::copy(mmac.data(), mmac.data() + 32, mac.data());
         std::array<uint8_t,32> mmac = msg.get_arr<32>();
         std::vector<uint8_t> eRc = msg.get_vec(512);
         std::vector<uint8_t> epayload = msg.get_vec();
@@ -178,8 +175,6 @@ public:
     static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
         Decoder msg{data};
         msg.get_u8();
-        //std::vector<uint8_t> mmac = msg.get_vec(32);
-        //std::copy(mmac.data(), mmac.data() + 32, mac.data());
         std::array<uint8_t,32> mmac = msg.get_arr<32>();
         auto eRs = msg.get_vec(512);
         auto eRc = msg.get_vec();
@@ -380,11 +375,29 @@ public:
     }
 };
 class Login : public Message {};
-class Logout : public Message {};
 class ReqPrekey : public Message {};
 class RetPrekey : public Message {};
 class AskPrekey : public Message {};
 class UploadPrekey : public Message {};
+
+/**
+ * Logout user from connection - msg from user to server
+ */
+class Logout : public Message {
+public:
+    std::vector<uint8_t> serialize() const {
+        Encoder message;
+        message.put(static_cast<uint8_t>(MessageType::Logout));
+        auto data = cry::get_random_data((size_t) 16);
+        message.put(data);
+
+        return message.move();
+    }
+
+    static std::unique_ptr<Message> deserialize([[maybe_unused]] const std::vector<uint8_t>& data) {
+        return std::make_unique<Logout>();
+    }
+};
 
 
 /**
@@ -521,6 +534,8 @@ public:
         deserialize_map.insert({MessageType::RetOnline, &RetOnline::deserialize});
         deserialize_map.insert({MessageType::ReqAlive, &ReqAlive::deserialize});
         deserialize_map.insert({MessageType::RespAlive, &RespAlive::deserialize});
+        deserialize_map.insert({MessageType::Logout, &Logout::deserialize});
+        
     }
 
     /**
