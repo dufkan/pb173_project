@@ -214,7 +214,7 @@ void Server::connection_handler() {
                 if(shutdown)
                     return;
             }
-#elif
+#else
             acc.accept(sock);
 #endif
 
