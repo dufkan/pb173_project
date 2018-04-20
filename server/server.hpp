@@ -196,10 +196,27 @@ Server::Server() {
 void Server::connection_handler() {
     using asio::ip::tcp;
     tcp::acceptor acc{io_service, tcp::endpoint(tcp::v4(), 1337)};
+#ifdef TESTMODE
+    acc.non_blocking(true);
+#endif
     for(;;) {
         try {
             tcp::socket sock{io_service};
+#ifdef TESTMODE
+            for(;;) {
+                try {
+                    acc.accept(sock);
+                    break;
+                }
+                catch(std::exception& e) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds{100});
+                }
+                if(shutdown)
+                    return;
+            }
+#elif
             acc.accept(sock);
+#endif
 
             Channel chan{std::move(sock)};
             //std::vector<uint8_t> recv_byte = chan.recv();
@@ -296,7 +313,7 @@ void Server::run() {
             break;
 #endif
     }
-    //t.join();
+    t.join();
 }
 
 void Server::release_connections(const std::vector<std::string>& dcs) {

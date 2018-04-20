@@ -20,6 +20,7 @@ int main(int argc, char** argv) {
 #include "test_channel.cpp"
 #include "test_client.cpp"
 #include "test_crybox.cpp"
+#include "test_communication.cpp"
 
 TEST_CASE("Challenge-Response") {
     msg::MessageDeserializer md;

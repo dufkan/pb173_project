@@ -23,7 +23,7 @@ cmain: client/main.cpp client/client.hpp
 smain: server/main.cpp server/server.hpp
 	$(CXX) $(CXXOPTS) -o $@ $< $(LINK)
 
-tests: test/test.cpp test/test_crypto.cpp test/test_server.cpp test/test_messages.cpp test/test_channel.cpp
+tests: test/test.cpp test/test_crypto.cpp test/test_server.cpp test/test_messages.cpp test/test_channel.cpp test/test_crybox.cpp test/test_communication.cpp
 	$(CXX) -DTESTMODE $(CXXOPTS) -o $@ $< $(LINK)
 
 mbedtls-clean:
