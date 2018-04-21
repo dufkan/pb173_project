@@ -44,6 +44,22 @@ TEST_CASE("Create and recieve message","without network") {
     }
 }
 
+TEST_CASE("Generate prekey") {
+    Client c;
+    size_t init = c.prekeys.size();
+
+    SECTION("Single key") {
+        c.generate_prekey();
+        REQUIRE(c.prekeys.size() == init + 1);
+    }
+
+    SECTION("Multiple keys") {
+        for(int i = 0; i < 32; ++i)
+            c.generate_prekey();
+        REQUIRE(c.prekeys.size() == init + 32);
+    }
+}
+
 /*
 TEST_CASE("Create message","Interaction with user"){
     

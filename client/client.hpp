@@ -30,6 +30,8 @@ public:
     std::ostream& out;
     std::ostream& err;
 
+    std::map<uint16_t, cry::ECKey> prekeys;
+
     msg::MessageDeserializer message_deserializer;
 
     /**
@@ -141,9 +143,18 @@ public:
      */
     void recv_thread();
 
+    /**
+     * Generate a new prekey
+     *
+     * @return ID of the new prekey
+     */
+    uint16_t generate_prekey();
+
 public:
     Client(std::string pseudonym = "noone", std::istream& in = std::cin, std::ostream& out = std::cout, std::ostream& err = std::cerr)
-        : pseudonym(std::move(pseudonym)), in(in), out(out), err(err) {}
+        : pseudonym(std::move(pseudonym)), in(in), out(out), err(err) {
+        generate_prekey();
+    }
 
     /**
      * Save psuedonym and key to cantacts
@@ -503,4 +514,16 @@ void Client::recv_thread() {
     }
     out << "Ending recv_thread" << std::endl;
 }
-#endif  
+
+uint16_t Client::generate_prekey() {
+    cry::ECKey prekey;
+    prekey.gen_pub_key();
+    uint16_t id;
+    do {
+        auto data = cry::get_random_data(sizeof(uint16_t));
+        std::copy(data.begin(), data.end(), &id);
+    } while(prekeys.find(id) != prekeys.end());
+    prekeys[id] = std::move(prekey);
+    return id;
+}
+#endif
