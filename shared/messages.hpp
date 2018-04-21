@@ -124,6 +124,10 @@ public:
         return lhs.pseudonym == rhs.pseudonym && lhs.Rc == rhs.Rc && lhs.key == rhs.key;
     }
 
+    friend bool operator!=(const ClientInit& lhs, const ClientInit& rhs) {
+        return !(lhs == rhs);
+    }
+
     bool check_mac(){
         return cry::check_mac(epayload,Rc,mac);
     }
@@ -190,6 +194,10 @@ public:
         return lhs.Rs == rhs.Rs && lhs.Rc == rhs.Rc;
     }
 
+    friend bool operator!=(const ServerResp& lhs, const ServerResp& rhs) {
+        return !(lhs == rhs);
+    }
+
     bool check_mac() {
         return cry::check_mac(eRc,Rs,mac);
     }
@@ -237,6 +245,10 @@ public:
 
     friend bool operator==(const ClientResp& lhs, const ClientResp& rhs) {
         return lhs.Rs == rhs.Rs;
+    }
+
+    friend bool operator!=(const ClientResp& lhs, const ClientResp& rhs) {
+        return !(lhs == rhs);
     }
 
 };
@@ -306,8 +318,12 @@ public:
         return text;
     }
 
-    bool operator==(const Send& s) const {
-        return receiver == s.receiver && text == s.text;
+    friend bool operator==(const Send& lhs, const Send& rhs) {
+        return lhs.receiver == rhs.receiver && lhs.text == rhs.text;
+    }
+
+    friend bool operator!=(const Send& lhs, const Send& rhs) {
+        return !(lhs == rhs);
     }
 };
 
@@ -370,15 +386,155 @@ public:
         return text;
     }
 
-    bool operator==(const Recv& s) const {
-        return sender == s.sender && text == s.text;
+    friend bool operator==(const Recv& lhs, const Recv& rhs) {
+        return lhs.sender == rhs.sender && lhs.text == rhs.text;
+    }
+
+    friend bool operator!=(const Recv& lhs, const Recv& rhs) {
+        return !(lhs == rhs);
     }
 };
+
 class Login : public Message {};
-class ReqPrekey : public Message {};
-class RetPrekey : public Message {};
-class AskPrekey : public Message {};
-class UploadPrekey : public Message {};
+
+/**
+ * Message sent by server when requesting a new prekey.
+ */
+class ReqPrekey : public Message {
+public:
+    std::vector<uint8_t> serialize() const {
+        Encoder message;
+        message.put(static_cast<uint8_t>(MessageType::ReqPrekey));
+        return message.move();
+    }
+
+    static std::unique_ptr<Message> deserialize([[maybe_unused]] const std::vector<uint8_t>& data) {
+        return std::make_unique<ReqPrekey>();
+    }
+
+    friend bool operator==([[maybe_unused]] const ReqPrekey& lhs, [[maybe_unused]] const ReqPrekey& rhs) {
+        return true;
+    }
+
+    friend bool operator!=(const ReqPrekey& lhs, const ReqPrekey& rhs) {
+        return !(lhs == rhs);
+    }
+};
+
+/**
+ * Message sent by server when returning asked for key to certain user.
+ */
+class RetPrekey : public Message {
+#ifdef TESTMODE
+public:
+#endif
+    std::string pseudonym;
+    uint16_t id;
+    std::array<uint8_t, 32> key;
+public:
+    RetPrekey(std::string pseudonym, uint16_t id, std::array<uint8_t, 32> key): pseudonym(std::move(pseudonym)), id(id), key(std::move(key)) {}
+
+    std::vector<uint8_t> serialize() const {
+        Encoder message;
+        message.put(static_cast<uint8_t>(MessageType::RetPrekey));
+        message.put(static_cast<uint8_t>(pseudonym.size()));
+        message.put(pseudonym);
+        message.put(static_cast<uint16_t>(id));
+        message.put(key);
+        return message.move();
+    }
+
+    static std::unique_ptr<Message> deserialize([[maybe_unused]] const std::vector<uint8_t>& data) {
+        Decoder d{data};
+        d.get_u8();
+        uint8_t plen = d.get_u8();
+        std::string pseudonym = d.get_str(plen);
+        uint16_t id = d.get_u16();
+        auto key = d.get_arr<32>();
+        return std::make_unique<RetPrekey>(std::move(pseudonym), id, std::move(key));
+    }
+
+    friend bool operator==(const RetPrekey& lhs, const RetPrekey& rhs) {
+        return lhs.pseudonym == rhs.pseudonym && lhs.id == rhs.id && lhs.key == rhs.key;
+    }
+
+    friend bool operator!=(const RetPrekey& lhs, const RetPrekey& rhs) {
+        return !(lhs == rhs);
+    }
+};
+
+/**
+ * Message sent by client to request prekey of some other client (specified by pseudonym).
+ */
+class AskPrekey : public Message {
+#ifdef TESTMODE
+public:
+#endif
+    std::string pseudonym;
+public:
+    AskPrekey(std::string pseudonym): pseudonym(std::move(pseudonym)) {}
+
+    std::vector<uint8_t> serialize() const {
+        Encoder message;
+        message.put(static_cast<uint8_t>(MessageType::AskPrekey));
+        message.put(static_cast<uint8_t>(pseudonym.size()));
+        message.put(pseudonym);
+        return message.move();
+    }
+
+    static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
+        Decoder d{data};
+        d.get_u8();
+        uint8_t plen = d.get_u8();
+        std::string pseudonym = d.get_str(plen);
+        return std::make_unique<AskPrekey>(std::move(pseudonym));
+    }
+
+    friend bool operator==(const AskPrekey& lhs, const AskPrekey& rhs) {
+        return lhs.pseudonym == rhs.pseudonym;
+    }
+
+    friend bool operator!=(const AskPrekey& lhs, const AskPrekey& rhs) {
+        return !(lhs == rhs);
+    }
+};
+
+/**
+ * Message sent by client to upload new prekey to server.
+ */
+class UploadPrekey : public Message {
+#ifdef TESTMODE
+public:
+#endif
+    uint16_t id;
+    std::array<uint8_t, 32> key;
+public:
+    UploadPrekey(uint16_t id, std::array<uint8_t, 32> key): id(id), key(std::move(key)) {}
+
+    std::vector<uint8_t> serialize() const {
+        Encoder message;
+        message.put(static_cast<uint8_t>(MessageType::UploadPrekey));
+        message.put(static_cast<uint16_t>(id));
+        message.put(key);
+        return message.move();
+    }
+
+    static std::unique_ptr<Message> deserialize([[maybe_unused]] const std::vector<uint8_t>& data) {
+        Decoder d{data};
+        d.get_u8();
+        uint16_t id = d.get_u16();
+        auto key = d.get_arr<32>();
+        return std::make_unique<UploadPrekey>(id, std::move(key));
+    }
+
+    friend bool operator==(const UploadPrekey& lhs, const UploadPrekey& rhs) {
+        return lhs.id == rhs.id && lhs.key == rhs.key;
+    }
+
+    friend bool operator!=(const UploadPrekey& lhs, const UploadPrekey& rhs) {
+        return !(lhs == rhs);
+    }
+};
 
 /**
  * Logout user from connection - msg from user to server
@@ -409,11 +565,10 @@ public:
     std::vector<uint8_t> serialize() const {
         Encoder message;
         message.put(static_cast<uint8_t>(MessageType::GetOnline));
-        return message.move();    
+        return message.move();
     }
 
     static std::unique_ptr<Message> deserialize([[maybe_unused]] const std::vector<uint8_t>& data) {
-        //Decoder message{data};
         return std::make_unique<GetOnline>();
     }
 };
@@ -428,7 +583,6 @@ public:
 #endif
     std::set<std::string> on_users;
 public:
-    
     RetOnline(std::set<std::string> on_users) : on_users(on_users) {}
 
     std::vector<uint8_t> serialize() {
@@ -467,8 +621,12 @@ public:
     }
 
 
-    bool operator==(const RetOnline& ret) const {
-        return (on_users == ret.on_users);
+    friend bool operator==(const RetOnline& lhs, const RetOnline& rhs) {
+        return lhs.on_users == rhs.on_users;
+    }
+
+    friend bool operator!=(const RetOnline& lhs, const RetOnline& rhs) {
+        return !(lhs == rhs);
     }
  };
 
@@ -491,8 +649,6 @@ public:
 
 
     static std::unique_ptr<Message> deserialize([[maybe_unused]] const std::vector<uint8_t>& data){
-        /*Decoder message{data};
-        message.get_u8(); */
         return std::make_unique<ReqAlive>();
     }
 };
@@ -535,7 +691,10 @@ public:
         deserialize_map.insert({MessageType::ReqAlive, &ReqAlive::deserialize});
         deserialize_map.insert({MessageType::RespAlive, &RespAlive::deserialize});
         deserialize_map.insert({MessageType::Logout, &Logout::deserialize});
-        
+        deserialize_map.insert({MessageType::ReqPrekey, &ReqPrekey::deserialize});
+        deserialize_map.insert({MessageType::RetPrekey, &RetPrekey::deserialize});
+        deserialize_map.insert({MessageType::UploadPrekey, &UploadPrekey::deserialize});
+        deserialize_map.insert({MessageType::AskPrekey, &AskPrekey::deserialize});
     }
 
     /**

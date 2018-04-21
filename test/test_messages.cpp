@@ -148,9 +148,56 @@ TEST_CASE("Message RetOline") {
     std::vector<uint8_t> reto_ser = reto.serialize();
 
     REQUIRE(msg::type(reto_ser) == msg::MessageType::RetOnline);
-    
+
     std::unique_ptr<msg::Message> msg_reto = reto.deserialize(reto_ser);
     msg::RetOnline& reto_des = dynamic_cast<msg::RetOnline&>(*msg_reto.get());
 
     CHECK(reto == reto_des);
+}
+
+TEST_CASE("Message ReqPrekey") {
+    auto original = msg::ReqPrekey{};
+
+    std::vector<uint8_t> serialized = original.serialize();
+    CHECK(msg::type(serialized) == msg::MessageType::ReqPrekey);
+
+    std::unique_ptr<msg::Message> deserialized = msg::ReqPrekey::deserialize(serialized);
+    msg::ReqPrekey& restored = dynamic_cast<msg::ReqPrekey&>(*deserialized.get());
+
+    CHECK(original == restored);
+}
+
+TEST_CASE("Message AskPrekey") {
+    std::string pseudonym = "House";
+
+    auto original = msg::AskPrekey{pseudonym};
+
+    CHECK(original.pseudonym == pseudonym);
+
+    std::vector<uint8_t> serialized = original.serialize();
+    CHECK(msg::type(serialized) == msg::MessageType::AskPrekey);
+
+    std::unique_ptr<msg::Message> deserialized = msg::AskPrekey::deserialize(serialized);
+    msg::AskPrekey& restored = dynamic_cast<msg::AskPrekey&>(*deserialized.get());
+
+    CHECK(original == restored);
+}
+
+TEST_CASE("Message UploadPrekey") {
+    uint16_t id = 65535;
+    std::array<uint8_t, 32> key;
+    cry::random_data(key);
+
+    auto original = msg::UploadPrekey{id, key};
+
+    CHECK(original.id == id);
+    CHECK(original.key == key);
+
+    std::vector<uint8_t> serialized = original.serialize();
+    CHECK(msg::type(serialized) == msg::MessageType::UploadPrekey);
+
+    std::unique_ptr<msg::Message> deserialized = msg::UploadPrekey::deserialize(serialized);
+    msg::UploadPrekey& restored = dynamic_cast<msg::UploadPrekey&>(*deserialized.get());
+
+    CHECK(original == restored);
 }
