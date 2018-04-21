@@ -199,3 +199,39 @@ TEST_CASE("RSA import and export") {
     REQUIRE(k.is_correct_priv(m));
     REQUIRE(!m.is_correct_priv(k));
 }
+
+
+
+
+
+TEST_CASE("ECDH generating public and private keys") {
+    cry::ECKey k;
+    k.gen_pub_key();
+    REQUIRE(k.has_pub());
+    REQUIRE(k.has_priv());
+    REQUIRE(k.is_correct_priv(k));
+}
+
+TEST_CASE("ECDH - share secret") {
+    cry::ECKey k;
+    cry::ECKey l;
+
+    k.gen_pub_key();
+    l.gen_pub_key();
+
+    std::array<uint8_t,32> kq = k.get_bin_q();
+    std::array<uint8_t,32> lq = l.get_bin_q();
+
+    k.load_bin_qp(lq);
+    l.load_bin_qp(kq);
+
+    k.compute_shared();
+    l.compute_shared();
+
+    REQUIRE(k.compare_shared(*(l.get())));
+    std::cout << (l.get())->z.n << std::endl;
+    std::cout << mbedtls_mpi_bitlen(&(l.get()->z)) << std::endl;
+    std::array<uint8_t,32> sk = k.get_shared();
+    std::array<uint8_t,32> sl = l.get_shared();
+    REQUIRE(sk==sl);
+}

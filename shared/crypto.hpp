@@ -12,6 +12,7 @@
 #include "mbedtls/cipher.h"
 #include "mbedtls/config.h"
 #include "mbedtls/ctr_drbg.h"
+#include "mbedtls/ecdh.h"
 #include "mbedtls/entropy.h"
 #include "mbedtls/rsa.h"
 #include "mbedtls/sha256.h"
@@ -40,7 +41,7 @@ public:
         mbedtls_rsa_copy(ctx, other.ctx);
         return *this;
     }
-
+    
     mbedtls_rsa_context* get() {
         return ctx;
     }
@@ -90,6 +91,89 @@ public:
     }
 }; //class RSAKey
 
+
+class ECKey {
+    mbedtls_ecdh_context ctx;
+
+public : 
+    ECKey() {
+        mbedtls_ecdh_init(&ctx);
+        mbedtls_ecp_group_load(&ctx.grp, MBEDTLS_ECP_DP_CURVE25519);
+    }
+
+    ECKey(const ECKey& other) {
+        mbedtls_ecdh_init(&ctx);
+        mbedtls_ecp_copy(&ctx.Q, &other.ctx.Q);
+        mbedtls_ecp_group_copy(&ctx.grp, &other.ctx.grp);
+    }
+
+
+    ECKey& operator=(const ECKey& other) {
+        mbedtls_ecdh_free(&ctx);
+        mbedtls_ecp_copy(&ctx.Q, &other.ctx.Q);
+        mbedtls_ecp_group_copy(&ctx.grp, &other.ctx.grp);
+        return *this;
+    }
+
+
+    mbedtls_ecdh_context* get() {
+        return &ctx;
+    }
+
+    const mbedtls_ecdh_context* get() const {
+        return &ctx;
+    }
+
+
+    /**
+     * Generate ECDH keypair
+     * 
+     */
+    void gen_pub_key();
+
+
+    /**
+     * Get point Q binary
+     *
+     */
+    std::array<uint8_t,32> get_bin_q();
+
+    /**
+     * Load from binary data point Qp
+     *
+     */ 
+    void load_bin_qp(const std::array<uint8_t,32>& point);
+
+    /**
+     * Compute shared secret
+     *
+     */ 
+    void compute_shared(); 
+
+
+    bool compare_shared(const mbedtls_ecdh_context& other) {
+        return !(mbedtls_mpi_cmp_mpi(&ctx.z, &other.z));
+    }
+
+
+    /**
+     * Return the shared secret in binary array
+     *
+     */
+    std::array<uint8_t,32> get_shared();
+
+    bool has_priv() const {
+        return mbedtls_ecp_check_privkey(&ctx.grp,&ctx.d) == 0;
+    }
+    
+    bool has_pub() const {
+        return mbedtls_ecp_check_pubkey(&ctx.grp, &ctx.Q) == 0; 
+    }
+
+    bool is_correct_priv(const ECKey& other) const;
+
+
+}; //ECKey
 
 
 /**
@@ -255,9 +339,6 @@ bool check_mac(const C& data, std::array<uint8_t, 32> key, std::array<uint8_t, 3
 
 
 
-
-
-
 std::vector<uint8_t> cry::RSAKey::export_pub() const {
     Encoder e;
     std::vector<uint8_t> N, P, Q, D, E;
@@ -298,6 +379,78 @@ std::vector<uint8_t> cry::RSAKey::export_all() const {
 void cry::RSAKey::import(const std::vector<uint8_t>& key) {
     mbedtls_rsa_import_raw(ctx, key.data(), 1024, key.data() + 1024, 1024, key.data() + 2*1024, 1024, key.data() + 3*1024, 1024, key.data() + 4*1024, 1024);
     mbedtls_rsa_complete(ctx);
+}
+
+
+void cry::ECKey::gen_pub_key() {
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    const char *pers = "ec_gen_pu_lkey";
+   
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+
+    mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers));
+    mbedtls_ecdh_gen_public(&ctx.grp, &ctx.d, &ctx.Q, mbedtls_ctr_drbg_random, &ctr_drbg);      
+       
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_free(&ctr_drbg);
+}
+
+
+std::array<uint8_t,32> cry::ECKey::get_bin_q() {
+    std::array<uint8_t,32> buf = {};
+    mbedtls_mpi_write_binary(&ctx.Q.X, buf.data(), 32);
+    return buf;
+}
+
+
+void cry::ECKey::load_bin_qp(const std::array<uint8_t,32>& point) {
+    mbedtls_mpi_lset(&ctx.Qp.Z,1);
+    mbedtls_mpi_read_binary(&ctx.Qp.X, point.data(), 32);       
+}
+
+
+void cry::ECKey::compute_shared() {
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    const char *pers = "ecdh_compute_share"; 
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+
+    mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers));
+
+    mbedtls_ecdh_compute_shared(&ctx.grp, &ctx.z, &ctx.Qp, &ctx.d, mbedtls_ctr_drbg_random, &ctr_drbg);
+        
+    mbedtls_ctr_drbg_free(&ctr_drbg);
+    mbedtls_entropy_free(&entropy);
+}
+
+
+std::array<uint8_t,32> cry::ECKey::get_shared() {
+    std::array<uint8_t,32> shared;
+    std::cout << mbedtls_mpi_write_binary(&ctx.z,shared.data(),shared.size()) << std::endl;
+    return std::move(shared);
+}
+
+
+bool cry::ECKey::is_correct_priv(const ECKey& other) const {
+    mbedtls_ecp_keypair priv;
+    mbedtls_ecp_keypair pub;
+    mbedtls_ecp_keypair_init(&priv);
+    mbedtls_ecp_keypair_init(&pub);
+
+    mbedtls_mpi_copy(&priv.d, &ctx.d);
+    //mbedtls_mpi_copy(&pub.d, &(other.get())->d);
+    mbedtls_ecp_group_copy(&priv.grp,&ctx.grp);
+    mbedtls_ecp_group_copy(&pub.grp,&(other.get())->grp);
+    mbedtls_ecp_copy(&priv.Q,&ctx.Q);
+    mbedtls_ecp_copy(&pub.Q, &(other.get())->Q);  
+
+    bool ret = (mbedtls_ecp_check_pub_priv(&pub, &priv)==0);
+    mbedtls_ecp_keypair_free(&priv);
+    mbedtls_ecp_keypair_free(&pub);
+    return has_priv() && ret;
 }
 
 
