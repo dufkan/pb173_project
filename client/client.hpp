@@ -25,12 +25,15 @@ public:
     std::map<std::string, std::array<uint8_t,32>> contacts;
     std::string pseudonym;
     std::optional<Channel> chan;
+    cry::ECKey IKey;
+    cry::ECKey SPKey;
     std::mutex output_mutex;
     std::istream& in;
     std::ostream& out;
     std::ostream& err;
 
     std::map<uint16_t, cry::ECKey> prekeys;
+
 
     msg::MessageDeserializer message_deserializer;
 
@@ -144,16 +147,48 @@ public:
     void recv_thread();
 
     /**
-     * Generate a new prekey
+     * Generate a new one time prekey OPKey
      *
      * @return ID of the new prekey
      */
     uint16_t generate_prekey();
 
+
+    /**
+     * Generate long term prekeys IKey and/or SPKey
+     *
+     * @param which 's' - SPKey, 'i' - IKey, 'b' - both
+     */
+    void generate_prekey_lt(char which); 
+
+
+    /**
+     * Compute shared key - the client who initiate connection
+     * 
+     * @param EK Ephermal key
+     * @param oSPK Public part of (net yet) Signed prekey of second client
+     * @param oIK Public part of Identity key of second client
+     * @param oOPK Public part of One time prekey of second client or {}
+     * 
+     * @return shared key
+     */
+    std::array<uint8_t,32> compute_share_init(cry::ECKey& EK, std::array<uint8_t,32>& oSPK, std::array<uint8_t,32>& oIK, std::array<uint8_t, 32> oOPK);
+
+    
+    /**
+     * Compute shared key - the recv client of connection
+     *
+     * @param IK Public part of Identity key of the first client
+     * @param EK Public part of Ephermal key of the first client
+     * @param idOPK Id of One time prekey used by the fisrt client
+     */
+    std::array<uint8_t, 32> compute_share_recv(std::array<uint8_t, 32>& IK, std::array<uint8_t, 32>& EK, size_t idOPK); 
+
 public:
     Client(std::string pseudonym = "noone", std::istream& in = std::cin, std::ostream& out = std::cout, std::ostream& err = std::cerr)
         : pseudonym(std::move(pseudonym)), in(in), out(out), err(err) {
         generate_prekey();
+        generate_prekey_lt('s');
     }
 
     /**
@@ -216,6 +251,31 @@ public:
         out << "w - wait for a message" << std::endl;
         out << "q - disconnect" << std::endl;
     }
+
+/*
+    msg::X3dhInit create_x3dh_msg(std::string pseudonym, uint16_t id, std::array<uint8_t, 32> EK, std::vector<uint8_t> text){
+        return msg::X3dhInit{pseudonym, IK.get_bin_q(), EK, id, text};
+    }
+*/
+
+    /**
+     * From params create a X3DH initial message and serialize it and compute share secret
+     *
+     * @param pseudonym Pseudonym of recv
+     * @param msg_prekey RetPrekey Message from server with prekeys
+     * @param text Text in the initial message
+     * @return serialized message
+     */
+    std::vector<uint8_t> x3dh_msg_byte(std::string pseudonym, msg::RetPrekey& msg_prekey, std::string text); 
+
+    /**
+     * Handling with vector of byte X3dhInit message and compute share secret
+     *
+     * @param vestor of byte of the message
+     * @return pair <name, text od init message>
+     */
+    std::pair<std::string, std::string> handle_x3dh_msg(std::vector<uint8_t> msg_u);
+    
 
 }; //Client
 
@@ -516,14 +576,113 @@ void Client::recv_thread() {
 }
 
 uint16_t Client::generate_prekey() {
-    cry::ECKey prekey;
-    prekey.gen_pub_key();
     uint16_t id;
     do {
         auto data = cry::get_random_data(sizeof(uint16_t));
         std::copy(data.begin(), data.end(), &id);
     } while(prekeys.find(id) != prekeys.end());
-    prekeys[id] = std::move(prekey);
+    prekeys[id].gen_pub_key();  
     return id;
+}
+
+
+void Client::generate_prekey_lt(char which) {
+    if (which == 'i' || which == 's') {
+        IKey.gen_pub_key();
+    }
+
+    if (which == 's' || which == 'i') {
+        SPKey.gen_pub_key();
+    } 
+} 
+
+
+std::vector<uint8_t> Client::x3dh_msg_byte(std::string pseudonym, msg::RetPrekey& msg_prekey, std::string text) {
+    std::vector<uint8_t> text_u(text.begin(), text.end());
+    cry::ECKey EK;
+    EK.gen_pub_key();
+    auto SPK = msg_prekey.get_SPK();
+    auto IK = msg_prekey.get_IK();
+    std::array<uint8_t, 32> K = compute_share_init(EK, SPK, IK, msg_prekey.get_OPK());
+    contacts[pseudonym] = K;
+
+    auto text_enc = cry::encrypt_aes(text_u, {}, K);
+
+    msg::X3dhInit msg{pseudonym, IKey.get_bin_q(), EK.get_bin_q(), msg_prekey.get_id(), text_enc};
+    return msg.serialize();
+}
+
+
+std::pair<std::string, std::string> Client::handle_x3dh_msg(std::vector<uint8_t> msg_u) {
+    std::unique_ptr<msg::Message> msg_des = msg::X3dhInit::deserialize(msg_u);
+    msg::X3dhInit& x3dh_des = dynamic_cast<msg::X3dhInit&>(*msg_des.get());
+    auto IK = x3dh_des.get_IK();
+    auto EK = x3dh_des.get_EK();
+    auto K = compute_share_recv(IK, EK, x3dh_des.get_id());
+    contacts[x3dh_des.get_name()]=K;
+
+    auto text_dec = cry::decrypt_aes(x3dh_des.get_text(), {}, K);
+    std::string text_s(text_dec.begin(), text_dec.end());
+    return std::make_pair(x3dh_des.get_name(), text_s);
+}
+
+
+
+std::array<uint8_t,32> Client::compute_share_init(cry::ECKey& EK, std::array<uint8_t,32>& oSPK, std::array<uint8_t,32>& oIK, std::array<uint8_t, 32> oOPK) {
+    IKey.load_bin_qp(oSPK);
+    IKey.compute_shared();
+    std::array<uint8_t, 32> dh1 = IKey.get_shared(); 
+
+    EK.load_bin_qp(oIK);
+    EK.compute_shared();
+    std::array<uint8_t, 32> dh2 = EK.get_shared();
+
+    EK.load_bin_qp(oSPK);
+    EK.compute_shared();
+    std::array<uint8_t, 32> dh3 = EK.get_shared();
+
+    std::vector<uint8_t> dh_con;
+    dh_con.insert(dh_con.end(), dh1.begin(), dh1.end());
+    dh_con.insert(dh_con.end(), dh2.begin(), dh2.end());
+    dh_con.insert(dh_con.end(), dh3.begin(), dh3.end());
+        
+    if (oOPK != std::array<uint8_t,32>{}) {
+        EK.load_bin_qp(oOPK);
+        EK.compute_shared();
+        std::array<uint8_t, 32> dh4 = EK.get_shared();
+
+        dh_con.insert(dh_con.end(), dh4.begin(), dh4.end());
+    }
+        
+    return cry::hash_sha(dh_con);
+}
+
+
+std::array<uint8_t, 32> Client::compute_share_recv(std::array<uint8_t, 32>& IK, std::array<uint8_t, 32>& EK, size_t idOPK) {
+    SPKey.load_bin_qp(IK);
+    SPKey.compute_shared();
+    std::array<uint8_t, 32> dh1 = SPKey.get_shared();
+    
+    IKey.load_bin_qp(EK);
+    IKey.compute_shared();
+    std::array<uint8_t, 32> dh2 = IKey.get_shared();
+
+    SPKey.load_bin_qp(EK);
+    SPKey.compute_shared();
+    std::array<uint8_t, 32> dh3 = SPKey.get_shared();
+      
+    std::vector<uint8_t> dh_con;
+    dh_con.insert(dh_con.end(), dh1.begin(), dh1.end());
+    dh_con.insert(dh_con.end(), dh2.begin(), dh2.end());
+    dh_con.insert(dh_con.end(), dh3.begin(), dh3.end());
+        
+    if (prekeys.find(idOPK) != prekeys.end()) {
+        prekeys[idOPK].load_bin_qp(EK);
+        prekeys[idOPK].compute_shared();
+        std::array<uint8_t, 32> dh4 = prekeys[idOPK].get_shared();
+
+        dh_con.insert(dh_con.end(), dh4.begin(), dh4.end());          
+    }
+    return cry::hash_sha(dh_con);
 }
 #endif

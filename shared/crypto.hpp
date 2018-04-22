@@ -104,12 +104,15 @@ public :
     ECKey(const ECKey& other) {
         mbedtls_ecdh_init(&ctx);
         mbedtls_ecp_copy(&ctx.Q, &other.ctx.Q);
+        mbedtls_ecp_group_load(&ctx.grp, MBEDTLS_ECP_DP_CURVE25519);
         mbedtls_ecp_group_copy(&ctx.grp, &other.ctx.grp);
     }
 
 
     ECKey& operator=(const ECKey& other) {
         mbedtls_ecdh_free(&ctx);
+        mbedtls_ecdh_init(&ctx);
+        mbedtls_ecp_group_load(&ctx.grp, MBEDTLS_ECP_DP_CURVE25519);
         mbedtls_ecp_copy(&ctx.Q, &other.ctx.Q);
         mbedtls_ecp_group_copy(&ctx.grp, &other.ctx.grp);
         return *this;
@@ -429,7 +432,7 @@ void cry::ECKey::compute_shared() {
 
 std::array<uint8_t,32> cry::ECKey::get_shared() {
     std::array<uint8_t,32> shared;
-    std::cout << mbedtls_mpi_write_binary(&ctx.z,shared.data(),shared.size()) << std::endl;
+    mbedtls_mpi_write_binary(&ctx.z,shared.data(),shared.size());
     return std::move(shared);
 }
 

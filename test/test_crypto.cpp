@@ -229,8 +229,6 @@ TEST_CASE("ECDH - share secret") {
     l.compute_shared();
 
     REQUIRE(k.compare_shared(*(l.get())));
-    std::cout << (l.get())->z.n << std::endl;
-    std::cout << mbedtls_mpi_bitlen(&(l.get()->z)) << std::endl;
     std::array<uint8_t,32> sk = k.get_shared();
     std::array<uint8_t,32> sl = l.get_shared();
     REQUIRE(sk==sl);
