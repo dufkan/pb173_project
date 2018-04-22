@@ -257,7 +257,7 @@ void Server::connection_handler() {
             auto uniq_cresp = message_deserializer(chan.recv());
             msg::ClientResp& cresp = dynamic_cast<msg::ClientResp&>(*uniq_cresp.get());
             cresp.decrypt(K);
-            std::array<uint8_t, 32> verify_Rs = cresp.get();
+            auto [verify_Rs, IK, SPK] = cresp.get();
 
             if(verify_Rs != Rs) {
                 std::cerr << "We got a BIG problem! 'Rs != Rs'" << std::endl;

@@ -209,43 +209,61 @@ class ClientResp : public Message {
 public:
 #endif
     std::array<uint8_t, 32> Rs;
-    std::vector<uint8_t> eRs;
+    std::optional<std::array<uint8_t, 32>> IK;
+    std::optional<std::array<uint8_t, 32>> SPK;
+    std::vector<uint8_t> epayload;
 
 
-    ClientResp(std::vector<uint8_t> eRs): eRs(std::move(eRs)) {}
+    ClientResp(std::vector<uint8_t> epayload): epayload(std::move(epayload)) {}
 public:
     ClientResp(std::array<uint8_t, 32> Rs): Rs(std::move(Rs)) {}
+    ClientResp(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> IK, std::array<uint8_t, 32> SPK): Rs(std::move(Rs)), IK(std::move(IK)), SPK(std::move(SPK)) {
+    }
 
     void encrypt(const std::array<uint8_t, 32>& K) {
-        eRs = cry::encrypt_aes(Rs, {}, K);
+        Encoder e;
+        e.put(Rs);
+        if(IK && SPK) {
+            e.put(static_cast<uint8_t>(1));
+            e.put(*IK);
+            e.put(*SPK);
+        }
+        else{
+            e.put(static_cast<uint8_t>(0));
+        }
+        epayload = cry::encrypt_aes(e.move(), {}, K);
     }
 
     void decrypt(const std::array<uint8_t, 32>& K) {
-        auto dRs = cry::decrypt_aes(eRs, {}, K);
-        std::copy(dRs.data(), dRs.data() + 32, Rs.data());
+        Decoder d{cry::decrypt_aes(epayload, {}, K)};
+        Rs = d.get_arr<32>();
+        if(d.get_u8() > 0) {
+            IK = d.get_arr<32>();
+            SPK = d.get_arr<32>();
+        }
     }
 
     std::vector<uint8_t> serialize() const {
         Encoder e;
         e.put(static_cast<uint8_t>(MessageType::ClientResp));
-        e.put(eRs);
+        e.put(epayload);
         return e.move();
     }
 
     static std::unique_ptr<Message> deserialize(const std::vector<uint8_t>& data) {
         Decoder msg{data};
         msg.get_u8();
-        auto eRs = msg.get_vec();
+        auto epayload = msg.get_vec();
 
-        return std::unique_ptr<ClientResp>(new ClientResp{eRs});
+        return std::unique_ptr<ClientResp>(new ClientResp{epayload});
     }
 
-    std::array<uint8_t, 32> get() const {
-        return Rs;
+    std::tuple<std::array<uint8_t, 32>, std::optional<std::array<uint8_t, 32>>, std::optional<std::array<uint8_t, 32>>> get() const {
+        return {Rs, IK, SPK};
     }
 
     friend bool operator==(const ClientResp& lhs, const ClientResp& rhs) {
-        return lhs.Rs == rhs.Rs;
+        return lhs.Rs == rhs.Rs && lhs.IK == rhs.IK && lhs.SPK == rhs.SPK;
     }
 
     friend bool operator!=(const ClientResp& lhs, const ClientResp& rhs) {

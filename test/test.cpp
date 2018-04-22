@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
 #include "test_crypto.cpp"
 #include "test_server.cpp"
 #include "test_messages.cpp"
-#include "test_channel.cpp"
+//#include "test_channel.cpp"
 #include "test_client.cpp"
 #include "test_crybox.cpp"
 //#include "test_communication.cpp"
@@ -65,6 +65,6 @@ TEST_CASE("Challenge-Response") {
     auto uniq_cresp = md(cresp.serialize());
     auto real_cresp = dynamic_cast<msg::ClientResp&>(*uniq_cresp.get());
     real_cresp.decrypt(K);
-    auto verify_Rs = real_cresp.get();
+    auto [verify_Rs, IK, SPK] = real_cresp.get();
     REQUIRE(verify_Rs == Rs); // client authenticated
 }
