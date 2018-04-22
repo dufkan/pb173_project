@@ -201,3 +201,72 @@ TEST_CASE("Message UploadPrekey") {
 
     CHECK(original == restored);
 }
+
+
+TEST_CASE("Message RetPrekye") {
+    uint16_t id = 65535;
+    std::string name = "my_name";
+    std::array<uint8_t, 32> OPK;
+    cry::random_data(OPK);
+
+    std::array<uint8_t, 32> IK;
+    cry::random_data(IK);
+
+    std::array<uint8_t, 32> SPK;
+    cry::random_data(SPK);
+    
+    auto original = msg::RetPrekey{name,id,OPK,IK,SPK};
+    
+    CHECK(original.pseudonym == name);
+    CHECK(name == original.get_name());
+    CHECK(original.id == id);
+    CHECK(id == original.get_id());
+    CHECK(original.IKey == IK);
+    CHECK(IK == original.get_IK());
+    CHECK(original.SPKey == SPK);
+    CHECK(SPK == original.get_SPK());
+    CHECK(original.OPKey == OPK);
+    CHECK(OPK == original.get_OPK());
+
+    std::vector<uint8_t> serialized = original.serialize();
+    CHECK(msg::type(serialized) == msg::MessageType::RetPrekey);
+
+    std::unique_ptr<msg::Message> deserialized = msg::RetPrekey::deserialize(serialized);
+    msg::RetPrekey& restored = dynamic_cast<msg::RetPrekey&>(*deserialized.get());
+    
+    CHECK(original == restored);
+}
+
+
+TEST_CASE("Message X3dhInit") {
+    uint16_t id = 65535;
+    std::array<uint8_t, 32> IK;
+    cry::random_data(IK);
+
+    std::array<uint8_t, 32> EK;
+    cry::random_data(EK);
+    
+    std::string pseudonym = "my_name";
+    std::vector<uint8_t> text = cry::get_random_data((size_t) 47);
+
+    auto original = msg::X3dhInit{pseudonym, IK, EK, id, text};
+    
+    CHECK(original.pseudonym == pseudonym);
+    CHECK(original.get_name() == pseudonym);
+    CHECK(original.IK == IK);
+    CHECK(original.get_IK() == IK);
+    CHECK(original.EK == EK);
+    CHECK(original.get_EK() == EK);
+    CHECK(original.id == id);
+    CHECK(original.get_id() == id);
+    CHECK(original.text == text);
+    CHECK(original.get_text() == text);
+
+    std::vector<uint8_t> serialized = original.serialize();
+    CHECK(msg::type(serialized) == msg::MessageType::X3dhInit);
+    
+    std::unique_ptr<msg::Message> deserialized = msg::X3dhInit::deserialize(serialized);
+    msg::X3dhInit& restored = dynamic_cast<msg::X3dhInit&>(*deserialized.get());
+    
+    CHECK(original == restored);
+}

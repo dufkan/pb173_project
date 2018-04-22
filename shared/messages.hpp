@@ -28,6 +28,7 @@ enum class MessageType : uint8_t {
     RetOnline,
     ReqAlive,
     RespAlive,
+    X3dhInit
 };
 
 /**
@@ -429,10 +430,12 @@ class RetPrekey : public Message {
 public:
 #endif
     std::string pseudonym;
-    uint16_t id;
-    std::array<uint8_t, 32> key;
+    uint16_t id;    /*one time prekey id*/
+    std::array<uint8_t, 32> OPKey; /*one time prekey*/
+    std::array<uint8_t, 32> IKey; /*identity key*/
+    std::array<uint8_t, 32> SPKey; /*(not yet) signed prekey*/
 public:
-    RetPrekey(std::string pseudonym, uint16_t id, std::array<uint8_t, 32> key): pseudonym(std::move(pseudonym)), id(id), key(std::move(key)) {}
+    RetPrekey(std::string pseudonym, uint16_t id, std::array<uint8_t, 32> OPKey, std::array<uint8_t, 32> IKey, std::array<uint8_t, 32> SPKey): pseudonym(std::move(pseudonym)), id(id), OPKey(std::move(OPKey)), IKey(std::move(IKey)), SPKey(std::move(SPKey)) {}
 
     std::vector<uint8_t> serialize() const {
         Encoder message;
@@ -440,7 +443,9 @@ public:
         message.put(static_cast<uint8_t>(pseudonym.size()));
         message.put(pseudonym);
         message.put(static_cast<uint16_t>(id));
-        message.put(key);
+        message.put(OPKey);
+        message.put(IKey);
+        message.put(SPKey);
         return message.move();
     }
 
@@ -450,16 +455,38 @@ public:
         uint8_t plen = d.get_u8();
         std::string pseudonym = d.get_str(plen);
         uint16_t id = d.get_u16();
-        auto key = d.get_arr<32>();
-        return std::make_unique<RetPrekey>(std::move(pseudonym), id, std::move(key));
+        auto OPKey = d.get_arr<32>();
+        auto IKey = d.get_arr<32>();
+        auto SPKey = d.get_arr<32>();
+        return std::make_unique<RetPrekey>(std::move(pseudonym), id, std::move(OPKey), std::move(IKey), std::move(SPKey));
     }
 
     friend bool operator==(const RetPrekey& lhs, const RetPrekey& rhs) {
-        return lhs.pseudonym == rhs.pseudonym && lhs.id == rhs.id && lhs.key == rhs.key;
+        return lhs.pseudonym == rhs.pseudonym && lhs.id == rhs.id && lhs.OPKey == rhs.OPKey && lhs.IKey == rhs.IKey && lhs.SPKey == rhs.SPKey ;
     }
 
     friend bool operator!=(const RetPrekey& lhs, const RetPrekey& rhs) {
         return !(lhs == rhs);
+    }
+
+    std::string get_name() {
+        return pseudonym;
+    }
+
+    uint16_t get_id() {
+        return id;
+    }
+
+    std::array<uint8_t, 32> get_OPK() {
+        return OPKey;
+    }
+
+    std::array<uint8_t, 32> get_IK() {
+        return IKey;
+    }
+
+    std::array<uint8_t, 32> get_SPK() {
+        return SPKey;
     }
 };
 
@@ -620,7 +647,6 @@ public:
         return (it != on_users.end());
     }
 
-
     friend bool operator==(const RetOnline& lhs, const RetOnline& rhs) {
         return lhs.on_users == rhs.on_users;
     }
@@ -670,6 +696,80 @@ public:
     }
 
 };
+
+
+class X3dhInit : public Message{
+#ifdef TESTMODE
+public:
+#endif
+    std::string pseudonym;
+    std::array<uint8_t, 32> IK;
+    std::array<uint8_t, 32> EK;
+    uint16_t id;
+    std::vector<uint8_t> text;
+
+public:
+    X3dhInit(std::string pseudonym, std::array<uint8_t, 32> IK, std::array<uint8_t, 32> EK, uint16_t id, std::vector<uint8_t> text) : pseudonym(pseudonym), IK(std::move(IK)), EK(std::move(EK)), id(id), text(std::move(text)) {}
+
+    std::vector<uint8_t> serialize() {
+        Encoder msg;
+        msg.put(static_cast<uint8_t>(MessageType::X3dhInit));
+        msg.put(static_cast<uint8_t>(pseudonym.size()));
+        msg.put(pseudonym);
+        msg.put(IK);
+        msg.put(EK);
+        msg.put(static_cast<uint16_t>(id));
+        msg.put(static_cast<uint16_t>(text.size()));
+        msg.put(text);
+        return msg.move();
+    }
+
+
+    static std::unique_ptr<Message> deserialize([[maybe_unused]] const std::vector<uint8_t>& data){
+        Decoder d{data};
+        d.get_u8();
+        uint8_t namelen = d.get_u8();
+        std::string name = d.get_str(namelen);
+        auto IK = d.get_arr<32>();
+        auto EK = d.get_arr<32>();
+        uint16_t id = d.get_u16();
+        uint16_t textlen = d.get_u16();
+        auto text = d.get_vec(textlen);
+         
+        return std::make_unique<X3dhInit>(name,std::move(IK),std::move(EK),id,std::move(text));
+    }
+
+    std::string get_name() {
+        return pseudonym;
+    }
+
+    std::array<uint8_t, 32> get_IK(){
+        return IK;
+    }
+
+    std::array<uint8_t, 32> get_EK(){
+        return EK;
+    }
+
+    uint16_t get_id(){
+        return id;
+    }
+
+    std::vector<uint8_t> get_text() {
+        return text;
+    }
+
+
+    friend bool operator==(const X3dhInit& lhs, const X3dhInit& rhs) {
+        return lhs.pseudonym == rhs.pseudonym && lhs.IK == rhs.IK && lhs.EK == rhs.EK && lhs.id == rhs.id && lhs.text == rhs.text;
+    }
+
+    friend bool operator!=(const X3dhInit& lhs, const X3dhInit& rhs) {
+        return !(lhs == rhs);
+    }
+};
+
+
 
 
 /**
