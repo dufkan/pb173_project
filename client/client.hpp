@@ -531,7 +531,7 @@ void Client::initiate_connection(){
     e.put(Rc);
     std::array<uint8_t, 32> K = cry::hash_sha(e.move());
 
-    msg::ClientResp cresp{Rs};
+    msg::ClientResp cresp{Rs, IKey.get_bin_q(), SPKey.get_bin_q()};
     cresp.encrypt(K);
     chan->send(cresp);
 

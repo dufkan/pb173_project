@@ -34,6 +34,7 @@ public:
     volatile bool shutdown = false;
 #endif
     std::map<std::string, Channel> connections;
+    std::map<std::string, std::tuple<std::array<uint8_t, 32>, std::array<uint8_t, 32>, std::vector<std::array<uint8_t, 32>>>> prekeys; // IK, SPK, OPK
     std::mutex connection_queue_mutex;
     std::deque<std::pair<std::string, Channel>> connection_queue;
     std::map<std::string, std::queue<std::vector<uint8_t>>> message_queue;
@@ -258,6 +259,8 @@ void Server::connection_handler() {
             msg::ClientResp& cresp = dynamic_cast<msg::ClientResp&>(*uniq_cresp.get());
             cresp.decrypt(K);
             auto [verify_Rs, IK, SPK] = cresp.get();
+            if(IK && SPK)
+                prekeys[pseudonym] = {*IK, *SPK, {}};
 
             if(verify_Rs != Rs) {
                 std::cerr << "We got a BIG problem! 'Rs != Rs'" << std::endl;
