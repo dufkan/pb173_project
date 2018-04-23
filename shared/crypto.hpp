@@ -433,7 +433,7 @@ void cry::ECKey::compute_shared() {
 std::array<uint8_t,32> cry::ECKey::get_shared() {
     std::array<uint8_t,32> shared;
     mbedtls_mpi_write_binary(&ctx.z,shared.data(),shared.size());
-    return std::move(shared);
+    return shared;
 }
 
 

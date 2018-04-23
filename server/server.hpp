@@ -34,7 +34,7 @@ public:
     volatile bool shutdown = false;
 #endif
     std::map<std::string, Channel> connections;
-    std::map<std::string, std::tuple<std::array<uint8_t, 32>, std::array<uint8_t, 32>, std::vector<std::array<uint8_t, 32>>>> prekeys; // IK, SPK, OPK
+    std::map<std::string, std::tuple<std::array<uint8_t, 32>, std::array<uint8_t, 32>, std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>>>> prekeys; // IK, SPK, OPK
     std::mutex connection_queue_mutex;
     std::deque<std::pair<std::string, Channel>> connection_queue;
     std::map<std::string, std::queue<std::vector<uint8_t>>> message_queue;
@@ -130,6 +130,22 @@ public:
      * @param msg - The message
      */
     void handle_get_online(const std::string& pseudonym, msg::GetOnline msg);
+
+    /**
+     * AskPrekey Message handler
+     *
+     * @param pseudonym - Originator of the message
+     * @param msg - The message
+     */
+    void handle_ask_prekey(const std::string& pseudonym, msg::AskPrekey msg);
+
+    /**
+     * UploadPrekey Message handler
+     *
+     * @param pseudonym - Originator of the message
+     * @param msg - The message
+     */
+    void handle_upload_prekey(const std::string& pseudonym, msg::UploadPrekey msg);
 
     /**
      * Message error handler
@@ -299,6 +315,10 @@ void Server::run() {
             else if(!c.second.is_alive()) {
                 dc_list.push_back(c.first);
             }
+            else if(std::get<2>(prekeys[c.first]).size() < 1) {
+                if(c.second.silence_duration().count() > 5)
+                    send_to(c.first, msg::ReqPrekey{}.serialize());
+            }
             else if(c.second.silence_duration().count() > 30) {
                 // poke client with a stick
                 msg::ReqAlive stick;
@@ -368,6 +388,12 @@ void Server::handle_message(const std::string& pseudonym, std::vector<uint8_t> m
         case msg::MessageType::GetOnline:
             handle_get_online(pseudonym, dynamic_cast<msg::GetOnline&>(*deserialized_msg.get()));
             break;
+        case msg::MessageType::AskPrekey:
+            handle_ask_prekey(pseudonym, dynamic_cast<msg::AskPrekey&>(*deserialized_msg.get()));
+            break;
+        case msg::MessageType::UploadPrekey:
+            handle_upload_prekey(pseudonym, dynamic_cast<msg::UploadPrekey&>(*deserialized_msg.get()));
+            break;
         case msg::MessageType::RespAlive:
             // client screamed, he is alive
             break;
@@ -382,5 +408,25 @@ void Server::handle_message(const std::string& pseudonym, std::vector<uint8_t> m
 void Server::handle_get_online(const std::string& pseudonym, msg::GetOnline msg) {
     msg::RetOnline res{get_connected_users()};
     send_to(pseudonym, res.serialize());
+}
+
+void Server::handle_ask_prekey(const std::string& pseudonym, msg::AskPrekey msg) {
+    auto pks = prekeys.find(msg.get_pseudonym());
+    if(pks == prekeys.end());
+    // TODO respond with error if fails
+    else {
+        auto& [IK, SPK, OPKs] = pks->second;
+        uint16_t id = 0;
+        std::array<uint8_t, 32> OPK{};
+        if(!OPKs.empty()) {
+            std::tie(id, OPK) = OPKs.back();
+            OPKs.pop_back();
+        }
+        send_to(pseudonym, msg::RetPrekey{msg.get_pseudonym(), id, OPK, IK, SPK}.serialize());
+    }
+}
+
+void Server::handle_upload_prekey(const std::string& pseudonym, msg::UploadPrekey msg) {
+    std::get<2>(prekeys[pseudonym]).push_back(msg.get());
 }
 #endif

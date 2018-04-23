@@ -535,6 +535,10 @@ public:
         return std::make_unique<AskPrekey>(std::move(pseudonym));
     }
 
+    std::string get_pseudonym() const {
+        return pseudonym;
+    }
+
     friend bool operator==(const AskPrekey& lhs, const AskPrekey& rhs) {
         return lhs.pseudonym == rhs.pseudonym;
     }
@@ -570,6 +574,10 @@ public:
         uint16_t id = d.get_u16();
         auto key = d.get_arr<32>();
         return std::make_unique<UploadPrekey>(id, std::move(key));
+    }
+
+    std::pair<uint16_t, std::array<uint8_t, 32>> get() const {
+        return {id, key};
     }
 
     friend bool operator==(const UploadPrekey& lhs, const UploadPrekey& rhs) {
