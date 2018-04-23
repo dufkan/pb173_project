@@ -65,13 +65,18 @@ TEST_CASE("Generate prekey") {
 TEST_CASE("X3DH secret share client") {
     Client alice;
     Client bob;
-    uint8_t id = bob.generate_prekey();
-    uint8_t id2 = bob.generate_prekey();
-    CHECK(bob.prekeys.find(id) != bob.prekeys.end());
-    CHECK(bob.prekeys.find(id2) != bob.prekeys.end());
-    cry::ECKey& OPK = bob.prekeys[id];
-    cry::ECKey& EK = bob.prekeys[id2];
+    //uint16_t id = 0x01;
+    //cry::ECKey& OPK;
+    SECTION("With OPK") {
 
+    uint16_t id = bob.generate_prekey();
+    CHECK(bob.prekeys.find(id) != bob.prekeys.end());
+    cry::ECKey& OPK = bob.prekeys[id];
+    
+    uint16_t id2 = bob.generate_prekey();
+    CHECK(bob.prekeys.find(id2) != bob.prekeys.end());
+    cry::ECKey& EK = bob.prekeys[id2];
+    
     auto SPKb = bob.SPKey.get_bin_q();
     auto IKb = bob.IKey.get_bin_q();
     auto OPKb = OPK.get_bin_q();
@@ -82,7 +87,24 @@ TEST_CASE("X3DH secret share client") {
     std::array<uint8_t, 32> Kb = bob.compute_share_recv(IKa, EKa, id);
 
     CHECK(Ka == Kb);
+    } 
+
+    SECTION("Without OPK") {
     
+    uint16_t id2 = bob.generate_prekey();
+    CHECK(bob.prekeys.find(id2) != bob.prekeys.end());
+    cry::ECKey& EK = bob.prekeys[id2];
+    
+    auto SPKb = bob.SPKey.get_bin_q();
+    auto IKb = bob.IKey.get_bin_q();
+    std::array<uint8_t, 32> Ka = alice.compute_share_init(EK, SPKb, IKb, {});
+
+    auto IKa = alice.IKey.get_bin_q();
+    auto EKa = EK.get_bin_q();
+    std::array<uint8_t, 32> Kb = bob.compute_share_recv(IKa, EKa, 0x01);
+
+    CHECK(Ka == Kb);
+    }
 }
 
 
