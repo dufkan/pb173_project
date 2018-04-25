@@ -122,7 +122,7 @@ TEST_CASE("X3DH message, prekeys exchange, initial message and share secret key"
 
     std::string text = "Ahoj ja jsem alice.";
     
-    std::vector<uint8_t> msg_ser = alice.x3dh_msg_byte("bob",msg_pre,text); 
+    std::vector<uint8_t> msg_ser = alice.x3dh_msg_byte(msg_pre,text); 
 
     std::unique_ptr<msg::Message> deserialized = msg::X3dhInit::deserialize(msg_ser);
     msg::X3dhInit& restored = dynamic_cast<msg::X3dhInit&>(*deserialized.get());

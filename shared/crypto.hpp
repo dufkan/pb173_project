@@ -636,7 +636,7 @@ template <typename C>
 std::array<uint8_t, 32> cry::mac_data(const C& data, std::array<uint8_t, 32> key) {
     const mbedtls_cipher_info_t* cipher_info = mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_256_ECB);
     std::array<uint8_t, 32> output{};
-
+    
     mbedtls_cipher_context_t ctx[1];
     mbedtls_cipher_init(ctx);
     mbedtls_cipher_setup(ctx, cipher_info);

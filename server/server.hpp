@@ -116,6 +116,17 @@ public:
     void handle_message(const std::string& pseudonym, std::vector<uint8_t> msg);
 
     /**
+     * Handle x3dh init message
+     *
+     * Deserializes massage, changes pseudonym and send
+     *
+     * @param pseudonym - client who sends x3dh message
+     * @param msg - Byte representation of the message
+     */
+
+    void handle_x3dh_init(const std::string& pseudonym, msg::X3dhInit msg);
+
+    /**
      * Send Message handler
      *
      * @param pseudonym - Originator of the message
@@ -400,6 +411,9 @@ void Server::handle_message(const std::string& pseudonym, std::vector<uint8_t> m
         case msg::MessageType::Logout:
             release_connections({pseudonym});
             break;
+        case msg::MessageType::X3dhInit:
+            handle_x3dh_init(pseudonym, dynamic_cast<msg::X3dhInit&>(*deserialized_msg.get()));
+            break;
         default:
             handle_error(*deserialized_msg.get());
     }
@@ -408,6 +422,13 @@ void Server::handle_message(const std::string& pseudonym, std::vector<uint8_t> m
 void Server::handle_get_online(const std::string& pseudonym, msg::GetOnline msg) {
     msg::RetOnline res{get_connected_users()};
     send_to(pseudonym, res.serialize());
+}
+
+void Server::handle_x3dh_init(const std::string& pseudonym, msg::X3dhInit msg) {
+    std::string recv = msg.get_name();
+    msg.change_name(pseudonym);
+    std::cout << "Handling x3dh init msg" << std::endl;
+    send_to(recv, msg.serialize());
 }
 
 void Server::handle_ask_prekey(const std::string& pseudonym, msg::AskPrekey msg) {

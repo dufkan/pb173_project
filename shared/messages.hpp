@@ -721,6 +721,7 @@ public:
         return std::make_unique<RespAlive>();
     }
 
+
 };
 
 
@@ -785,6 +786,9 @@ public:
         return text;
     }
 
+    void change_name(std::string new_name){
+        pseudonym = new_name;
+    }
 
     friend bool operator==(const X3dhInit& lhs, const X3dhInit& rhs) {
         return lhs.pseudonym == rhs.pseudonym && lhs.IK == rhs.IK && lhs.EK == rhs.EK && lhs.id == rhs.id && lhs.text == rhs.text;
@@ -821,6 +825,7 @@ public:
         deserialize_map.insert({MessageType::RetPrekey, &RetPrekey::deserialize});
         deserialize_map.insert({MessageType::UploadPrekey, &UploadPrekey::deserialize});
         deserialize_map.insert({MessageType::AskPrekey, &AskPrekey::deserialize});
+        deserialize_map.insert({MessageType::X3dhInit, &X3dhInit::deserialize});
     }
 
     /**

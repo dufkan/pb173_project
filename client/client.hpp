@@ -243,13 +243,15 @@ public:
 
 
     void print_menu() {
-        out << "a - add contact" << std::endl;
-        out << "o - get online users" << std::endl;
-        out << "z - send a message to (a user) me" << std::endl;
+        out << "a - add contact with defaul key K" << std::endl;
+        out << "c - show saved contacts" << std::endl;
         out << "d - send me a dafualt message" << std::endl;
-        out << "s - send to another user a message" << std::endl;
-        out << "w - wait for a message" << std::endl;
+        out << "o - get online users" << std::endl;
         out << "q - disconnect" << std::endl;
+        out << "s - send to another user a message" << std::endl;
+        //out << "w - wait for a message" << std::endl;
+        out << "x - add contact (ask for prekeys, compute share with X3DH" << std::endl;
+        out << "z - send a message to (a user) me" << std::endl;
     }
 
 /*
@@ -266,7 +268,7 @@ public:
      * @param text Text in the initial message
      * @return serialized message
      */
-    std::vector<uint8_t> x3dh_msg_byte(std::string pseudonym, msg::RetPrekey& msg_prekey, std::string text); 
+    std::vector<uint8_t> x3dh_msg_byte(msg::RetPrekey& msg_prekey, std::string text); 
 
     /**
      * Handling with vector of byte X3dhInit message and compute share secret
@@ -277,6 +279,44 @@ public:
     std::pair<std::string, std::string> handle_x3dh_msg(std::vector<uint8_t> msg_u);
     
 
+
+    /**
+     * Create AskPrekey message with param pseudonym
+     *  
+     * @param pseudonym Client from who we want to have prekeys
+     * @return serialized message
+     */
+    std::vector<uint8_t> ask_prekey_byte(std::string pseudonym) {
+        msg::AskPrekey m{pseudonym};
+        return m.serialize();
+    }
+
+
+    /**
+     * Create new prekey and UploadPrekey message with it
+     *
+     * @return serialized message
+     */
+    std::vector<uint8_t> upload_prekey_byte(){
+        uint16_t pid = generate_prekey();
+        msg::UploadPrekey m{pid, prekeys[pid].get_bin_q()};
+        return m.serialize();        
+    }
+
+
+    void upload_prekeys() {
+        for (unsigned int i = prekeys.size(); i <= 10; i ++){
+            chan->send(upload_prekey_byte());
+        }
+    }
+
+
+    void show_contacts() {
+        for (auto& c : contacts) {
+            std::cout << c.first << std::endl;
+        }
+    }
+    
 }; //Client
 
 
@@ -449,6 +489,8 @@ void Client::run() {
     chan = Channel{std::move(sock)};
     initiate_connection();
 
+    upload_prekeys(); 
+
     std::vector<uint8_t> recv_byte;
     print_menu();
     auto t = std::thread(&Client::recv_thread, this);
@@ -463,20 +505,34 @@ void Client::run() {
             case 'a':
                 add_friend();
                 break;
-            case 'o':
-                chan->send(get_online_message());
+
+            case 'c':
+                show_contacts();
                 break;
+            
             case 'd':
                 chan->send(send_msg_byte(pseudonym, "Ahoj, testuju zpravy"));
                 break;
-            case 'z':
-                std::tie(p, t) = ui_get_param_msg();
-                chan->send(send_msg_byte(pseudonym, t));
+
+            case 'o':
+                chan->send(get_online_message());
                 break;
+            
             case 's':
                 std::tie(p, t) = ui_get_param_msg();
                 chan->send(send_msg_byte(p, t));
                 break;
+
+            case 'x': {
+                std::string recv;
+                load_recv(recv);
+                chan->send(ask_prekey_byte(recv));                
+                break;}
+            case 'z':
+                std::tie(p, t) = ui_get_param_msg();
+                chan->send(send_msg_byte(pseudonym, t));
+                break;
+
         }
         if (what == 'q') {
             chan->send(get_logout_message());
@@ -556,6 +612,24 @@ void Client::handle_message(const std::vector<uint8_t>& data) {
                 out << std::flush;
             }
             break;
+        case msg::MessageType::RetPrekey:
+            {
+                std::lock_guard<std::mutex> lock{output_mutex};
+                std::string m = "Hello I want to connect with you, " + pseudonym;
+                std::unique_ptr<msg::Message> msg_des = msg::RetPrekey::deserialize(data);
+                msg::RetPrekey& recv_des = dynamic_cast<msg::RetPrekey&>(*msg_des.get());
+                chan->send(x3dh_msg_byte(recv_des,m));
+                out << std::flush;
+            }
+            break;
+        case msg::MessageType::X3dhInit:
+            {
+                std::lock_guard<std::mutex> lock{output_mutex};
+                auto [p,m] = handle_x3dh_msg(data);
+                std::cout << m << std::endl << p << " was added to contacts." << std::endl;
+                out << std::flush;
+            }
+            break;
         default:
             break;
     }
@@ -597,18 +671,18 @@ void Client::generate_prekey_lt(char which) {
 } 
 
 
-std::vector<uint8_t> Client::x3dh_msg_byte(std::string pseudonym, msg::RetPrekey& msg_prekey, std::string text) {
+std::vector<uint8_t> Client::x3dh_msg_byte(msg::RetPrekey& msg_prekey, std::string text) {
     std::vector<uint8_t> text_u(text.begin(), text.end());
     cry::ECKey EK;
     EK.gen_pub_key();
     auto SPK = msg_prekey.get_SPK();
     auto IK = msg_prekey.get_IK();
     std::array<uint8_t, 32> K = compute_share_init(EK, SPK, IK, msg_prekey.get_OPK());
-    contacts[pseudonym] = K;
+    contacts[msg_prekey.get_name()] = K;
 
     auto text_enc = cry::encrypt_aes(text_u, {}, K);
 
-    msg::X3dhInit msg{pseudonym, IKey.get_bin_q(), EK.get_bin_q(), msg_prekey.get_id(), text_enc};
+    msg::X3dhInit msg{msg_prekey.get_name(), IKey.get_bin_q(), EK.get_bin_q(), msg_prekey.get_id(), text_enc};
     return msg.serialize();
 }
 
