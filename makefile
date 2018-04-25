@@ -1,16 +1,17 @@
 CXXSTD=17
-CXXFLAGS=-Wall -Wextra -g -DASIO_STANDALONE
+CXXFLAGS=-Wall -Wextra -DASIO_STANDALONE
 LINK=libs/mbedtls/library/libmbedcrypto.a -lpthread -lstdc++fs
 INCLUDE_DIRS=-Ilibs/mbedtls/include/ -Ilibs/asio/include/
 
 CXXOPTS=-std=c++$(CXXSTD) $(CXXFLAGS) $(INCLUDE_DIRS)
 
-TEST_JUNK=noread nowrite noexist keys/u*
+TEST_JUNK=noread nowrite noexist keys/u* prekeys/u*
 
 all: mbedtls smain cmain tests
 
 test: tests
 	mkdir -p keys
+	mkdir -p prekeys
 	rm -f $(TEST_JUNK)
 	touch noread nowrite
 	chmod -r noread

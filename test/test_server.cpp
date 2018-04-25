@@ -1,4 +1,5 @@
 #include "../server/server.hpp"
+#include <numeric>
 
 TEST_CASE("File IO", "[file]") {
     SECTION("Read") {
@@ -98,5 +99,41 @@ TEST_CASE("Handle Send") {
         REQUIRE(m3.get_text() == std::vector<uint8_t>{0x61, 0x61, 0x62, 0x63});
 
         REQUIRE(s.message_queue["alice"].empty());
+    }
+}
+
+TEST_CASE("Store/load prekey") {
+    for(int i = 0; i < 10; ++i) {
+        std::array<uint8_t, 32> IK;
+        std::iota(IK.begin(), IK.end(), i);
+        std::array<uint8_t, 32> SPK;
+        std::iota(SPK.begin(), SPK.end(), i * 8);
+        std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>> OPKs;
+        for(int j = 0; j < i; ++j) {
+            uint16_t id = j * 1024;
+            std::array<uint8_t, 32> OPK;
+            std::iota(OPK.begin(), OPK.end(), j);
+            OPKs.push_back({id, OPK});
+        }
+        Server::store_prekeys("u" + std::to_string(i), IK, SPK, OPKs);
+    }
+
+    for(int i = 0; i < 10; ++i) {
+        std::array<uint8_t, 32> IK;
+        std::iota(IK.begin(), IK.end(), i);
+        std::array<uint8_t, 32> SPK;
+        std::iota(SPK.begin(), SPK.end(), i * 8);
+
+        auto [stored_IK, stored_SPK, stored_OPKs] = Server::load_prekeys("u" + std::to_string(i));
+        REQUIRE(IK == stored_IK);
+        REQUIRE(SPK == stored_SPK);
+        REQUIRE(stored_OPKs.size() == i);
+
+        for(int j = 0; j < i; ++j) {
+            uint16_t id = j * 1024;
+            std::array<uint8_t, 32> OPK;
+            std::iota(OPK.begin(), OPK.end(), j);
+            REQUIRE(stored_OPKs[j] == std::pair{id, OPK});
+        }
     }
 }

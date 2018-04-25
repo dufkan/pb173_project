@@ -92,6 +92,24 @@ public:
      * @param msg - Vector of bytes to send
      */
     void send_to(const std::string& pseudonym, const std::vector<uint8_t>& msg);
+
+    /**
+     * Store prekeys of certain client
+     *
+     * @param pseudonym - Pseudonym
+     * @param IK - Identity key
+     * @param SPK - Signed Prekey
+     * @param OPKs - Vector of one-time prekeys with assigned ids
+     */
+    static void store_prekeys(const std::string pseudonym, std::array<uint8_t, 32> IK, std::array<uint8_t, 32> SPK, std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>> OPKs);
+
+    /**
+     * Load prekeys of certain client from local file
+     *
+     * @param pseudonym - Name of the Client
+     * @returns The ALL-IN-ONE bundle!
+     */
+    static std::tuple<std::array<uint8_t, 32>, std::array<uint8_t, 32>, std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>>> load_prekeys(const std::string pseudonym);
 public:
     Server();
 
@@ -219,6 +237,7 @@ void Server::sync_connections() {
 
 Server::Server() {
     prepare_key();
+    // TODO prepare_prekeys();
 }
 
 void Server::connection_handler() {
@@ -286,8 +305,6 @@ void Server::connection_handler() {
             msg::ClientResp& cresp = dynamic_cast<msg::ClientResp&>(*uniq_cresp.get());
             cresp.decrypt(K);
             auto [verify_Rs, IK, SPK] = cresp.get();
-            if(IK && SPK)
-                prekeys[pseudonym] = {*IK, *SPK, {}};
 
             if(verify_Rs != Rs) {
                 std::cerr << "We got a BIG problem! 'Rs != Rs'" << std::endl;
@@ -295,6 +312,11 @@ void Server::connection_handler() {
             }
 
             chan.set_crybox(std::unique_ptr<CryBox>{new SeqBox{new AESBox{K}, new MACBox{K}}});
+
+            if(IK && SPK) {
+                prekeys[pseudonym] = {*IK, *SPK, {}};
+                store_prekeys(pseudonym, *IK, *SPK, {});
+            }
 
             if(local_key.empty() && !client_key.empty())
                 store_client_key(pseudonym, client_key);
@@ -442,6 +464,7 @@ void Server::handle_ask_prekey(const std::string& pseudonym, msg::AskPrekey msg)
         if(!OPKs.empty()) {
             std::tie(id, OPK) = OPKs.back();
             OPKs.pop_back();
+            store_prekeys(pks->first, std::get<0>(pks->second), std::get<1>(pks->second), std::get<2>(pks->second));
         }
         send_to(pseudonym, msg::RetPrekey{msg.get_pseudonym(), id, OPK, IK, SPK}.serialize());
     }
@@ -449,5 +472,31 @@ void Server::handle_ask_prekey(const std::string& pseudonym, msg::AskPrekey msg)
 
 void Server::handle_upload_prekey(const std::string& pseudonym, msg::UploadPrekey msg) {
     std::get<2>(prekeys[pseudonym]).push_back(msg.get());
+}
+
+void Server::store_prekeys(const std::string pseudonym, std::array<uint8_t, 32> IK, std::array<uint8_t, 32> SPK, std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>> OPKs) {
+    Encoder e;
+    e.put(IK);
+    e.put(SPK);
+    e.put(static_cast<uint16_t>(OPKs.size()));
+    for(auto& [id, OPK] : OPKs) {
+        e.put(id);
+        e.put(OPK);
+    }
+    util::write_file("prekeys/" + pseudonym, e.move());
+}
+
+std::tuple<std::array<uint8_t, 32>, std::array<uint8_t, 32>, std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>>> Server::load_prekeys(const std::string pseudonym) {
+    Decoder d{util::read_file("prekeys/" + pseudonym)};
+    auto IK = d.get_arr<32>();
+    auto SPK = d.get_arr<32>();
+    auto OPKslen = d.get_u16();
+    std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>> OPKs;
+    for(uint16_t i = 0; i < OPKslen; ++i) {
+        auto id = d.get_u16();
+        auto OPK = d.get_arr<32>();
+        OPKs.push_back({id, OPK});
+    }
+    return {IK, SPK, std::move(OPKs)};
 }
 #endif
