@@ -153,6 +153,7 @@ TEST_CASE("X3DH message, prekeys exchange, initial message and share secret key"
      */
     auto recv = bob.handle_x3dh_msg(msg_ser); 
 
+    CHECK(bob.prekeys.find(id) == bob.prekeys.end());
     CHECK(bob.contacts["bob"] == alice.contacts["bob"]);
     CHECK(recv.second == text);
 }

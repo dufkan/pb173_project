@@ -254,11 +254,6 @@ public:
         out << "z - send a message to (a user) me" << std::endl;
     }
 
-/*
-    msg::X3dhInit create_x3dh_msg(std::string pseudonym, uint16_t id, std::array<uint8_t, 32> EK, std::vector<uint8_t> text){
-        return msg::X3dhInit{pseudonym, IK.get_bin_q(), EK, id, text};
-    }
-*/
 
     /**
      * From params create a X3DH initial message and serialize it and compute share secret
@@ -304,6 +299,10 @@ public:
     }
 
 
+    /**
+     * Send some uploading message to server
+     *
+     */
     void upload_prekeys() {
         for (unsigned int i = prekeys.size(); i <= 10; i ++){
             chan->send(upload_prekey_byte());
@@ -311,6 +310,10 @@ public:
     }
 
 
+    /**
+     * Print saved contacts to std::cout
+     *
+     */ 
     void show_contacts() {
         for (auto& c : contacts) {
             std::cout << c.first << std::endl;
@@ -462,19 +465,8 @@ void Client::add_friend() {
          std::string name;
          bool okaa = load_recv(name);
          std::array<uint8_t, 32> key = {{0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe, 0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81, 0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7, 0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4}};
-        /*std::string fname = "friend_" + name; 
-        try {
-            std::vector<uint8_t> file_ckey = util::read_file(fname);
-            copy(file_ckey.begin(),file_ckey.begin()+32,key.begin());
-    
-        } catch (std::ios_base::failure& e) {
-            cry::generate_rsa_keys(ckey, ckey);
-            util::write_file(pseudonym,ckey.export_all(),false);
-        }*/
-
         add_contact(name,key);     
-    }
-
+}
 
 
 
@@ -678,7 +670,8 @@ std::vector<uint8_t> Client::x3dh_msg_byte(msg::RetPrekey& msg_prekey, std::stri
     auto SPK = msg_prekey.get_SPK();
     auto IK = msg_prekey.get_IK();
     std::array<uint8_t, 32> K = compute_share_init(EK, SPK, IK, msg_prekey.get_OPK());
-    contacts[msg_prekey.get_name()] = K;
+
+    contacts[msg_prekey.get_name()] = K; //TODO error if client is already saved in contacts
 
     auto text_enc = cry::encrypt_aes(text_u, {}, K);
 
@@ -693,7 +686,8 @@ std::pair<std::string, std::string> Client::handle_x3dh_msg(std::vector<uint8_t>
     auto IK = x3dh_des.get_IK();
     auto EK = x3dh_des.get_EK();
     auto K = compute_share_recv(IK, EK, x3dh_des.get_id());
-    contacts[x3dh_des.get_name()]=K;
+    
+    contacts[x3dh_des.get_name()]=K; //TODO error if client is already saved in contacts
 
     auto text_dec = cry::decrypt_aes(x3dh_des.get_text(), {}, K);
     std::string text_s(text_dec.begin(), text_dec.end());
@@ -754,7 +748,7 @@ std::array<uint8_t, 32> Client::compute_share_recv(std::array<uint8_t, 32>& IK, 
         prekeys[idOPK].load_bin_qp(EK);
         prekeys[idOPK].compute_shared();
         std::array<uint8_t, 32> dh4 = prekeys[idOPK].get_shared();
-
+        prekeys.erase(idOPK);
         dh_con.insert(dh_con.end(), dh4.begin(), dh4.end());          
     }
     return cry::hash_sha(dh_con);
