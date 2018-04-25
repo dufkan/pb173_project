@@ -65,8 +65,6 @@ TEST_CASE("Generate prekey") {
 TEST_CASE("X3DH secret share client") {
     Client alice;
     Client bob;
-    //uint16_t id = 0x01;
-    //cry::ECKey& OPK;
     SECTION("With OPK") {
 
     uint16_t id = bob.generate_prekey();
@@ -110,7 +108,6 @@ TEST_CASE("X3DH secret share client") {
 
 
 
-
 TEST_CASE("X3DH message, prekeys exchange, initial message and share secret key") {
     Client alice;
     Client bob;
@@ -130,27 +127,7 @@ TEST_CASE("X3DH message, prekeys exchange, initial message and share secret key"
     CHECK(restored.get_name() == "bob");
     CHECK(restored.get_id() == id);
     CHECK(restored.get_IK() == alice.IKey.get_bin_q());
-    /*
-    std::vector<uint8_t> text_u(text.begin(), text.end());
-    auto text_enc = cry::encrypt_aes(text_u, {}, alice.contacts["bob"]);
-    CHECK(restored.get_text() == text_enc);
-       
-    auto IK = restored.get_IK();
-    auto EK = restored.get_EK();
-    auto K = bob.compute_share_recv(IK, EK, restored.get_id());
-    
-    CHECK(alice.contacts["bob"] == K);
-    
-    bob.contacts[restored.get_name()]=K;
 
-    auto text_dec = cry::decrypt_aes(restored.get_text(), {}, K);
-    CHECK(text_dec == text_u);
-    std::cout << text_dec.size();
-
-    std::vector<char> text_v(text_dec.begin(), text_dec.end());
-    std::string text_s(text_dec.begin(), text_dec.end());
-    std::cout << text_s.size() <<std::endl << text_s << std::endl;
-     */
     auto recv = bob.handle_x3dh_msg(msg_ser); 
 
     CHECK(bob.prekeys.find(id) == bob.prekeys.end());
