@@ -134,3 +134,34 @@ TEST_CASE("X3DH message, prekeys exchange, initial message and share secret key"
     CHECK(bob.contacts["bob"] == alice.contacts["bob"]);
     CHECK(recv.second == text);
 }
+
+
+TEST_CASE("save and load client params") {
+    std::string pseudonym = "noone";
+    std::vector<uint8_t> bin_ik;
+    std::vector<uint8_t> bin_spk;
+    std::array<uint8_t, 32> bin_qp;
+
+    Client manka;
+
+    manka.generate_prekey_lt('b');
+    bin_ik = manka.IKey.get_key_binary();
+    bin_spk = manka.SPKey.get_key_binary();
+    bin_qp = manka.IKey.get_bin_q();
+    manka.save_keys();
+ 
+    std::array<uint8_t, 32> key_cipis = {{0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe, 0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81, 0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7, 0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4}};
+    std::array<uint8_t, 32> key_raholec = {{0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe, 0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81, 0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7, 0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4}};
+    manka.add_contact("cipis",key_cipis);
+    manka.add_contact("raholec",key_raholec);
+    manka.save_contacts();
+       
+    Client rumc;
+    rumc.load_keys();
+    rumc.load_contacts();    
+
+    CHECK(bin_ik == rumc.IKey.get_key_binary());
+    CHECK(bin_spk == rumc.SPKey.get_key_binary());
+    CHECK(bin_qp == rumc.IKey.get_bin_q());
+    CHECK(manka.contacts == rumc.contacts);
+}

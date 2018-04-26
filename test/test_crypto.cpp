@@ -238,17 +238,18 @@ TEST_CASE("ECDH - share secret") {
 }
 
 
-TEST_CASE("ECKey - save in file") {
-    std::string fname = "eckey"; 
+TEST_CASE("ECKey - get and load binary") {
+    std::vector<uint8_t> data; 
     cry::ECKey k;
     cry::ECKey new_k;
     k.gen_pub_key();
 
-    k.save_key_in_file("infile");
-    new_k.load_key_from_file("infile");
+    data = k.get_key_binary();
+    new_k.load_key_binary(data);
     
     CHECK(new_k.has_priv());
     CHECK(new_k.has_pub());
+    CHECK(new_k.is_correct_priv(k));
     CHECK(mbedtls_ecp_check_pubkey(&new_k.get()->grp,&new_k.get()->Q)==0);
     REQUIRE( k == new_k);    
 }

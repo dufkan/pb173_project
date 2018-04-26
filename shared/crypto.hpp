@@ -198,14 +198,14 @@ public :
      *
      * @param fname Name of th file
      */
-    void save_key_in_file (std::string fname) const;
+    std::vector<uint8_t> get_key_binary () const;
 
     /**
      * Load params to ECKey from file
      *
      * @param fname Name of the file
      */ 
-    void load_key_from_file (std::string fname);
+    void load_key_binary (std::vector<uint8_t>& data);
 
 }; //ECKey
 
@@ -488,7 +488,10 @@ bool cry::ECKey::is_correct_priv(const ECKey& other) const {
 }
 
 
-void cry::ECKey::save_key_in_file(std::string fname) const {
+
+
+
+std::vector<uint8_t> cry::ECKey::get_key_binary() const {
     Encoder enc;
     std::vector<uint8_t> buf;
     size_t bsize = mbedtls_mpi_size(&ctx.grp.P);
@@ -500,12 +503,12 @@ void cry::ECKey::save_key_in_file(std::string fname) const {
     buf.resize(32);
     mbedtls_mpi_write_binary(&ctx.d,buf.data(),32);
     enc.put(buf);
-    util::write_file(fname,enc.get(), false);
+    return enc.get();
 }
 
 
-void cry::ECKey::load_key_from_file (std::string fname) {
-    Decoder dec{util::read_file(fname)};
+void cry::ECKey::load_key_binary (std::vector<uint8_t>& data) {
+    Decoder dec{data};
     size_t len = static_cast<uint32_t>(dec.get_u32());
     
     std::vector<uint8_t> point = dec.get_vec(len);

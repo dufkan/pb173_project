@@ -184,11 +184,39 @@ public:
      */
     std::array<uint8_t, 32> compute_share_recv(std::array<uint8_t, 32>& IK, std::array<uint8_t, 32>& EK, size_t idOPK); 
 
+    /**
+     * Save keys in files and be able to use them for next run
+     * Use before exit
+     *
+     */
+    void save_keys(); 
+
+
+    /**
+     * Load keys from files
+     *
+     */
+    void load_keys(); 
+
+
+    /**
+     * Save contacts with keys for the next use
+     *
+     */
+    void save_contacts();
+    
+    
+    /**
+     * Load contacts
+     *
+     */
+    void load_contacts();
+
 public:
     Client(std::string pseudonym = "noone", std::istream& in = std::cin, std::ostream& out = std::cout, std::ostream& err = std::cerr)
         : pseudonym(std::move(pseudonym)), in(in), out(out), err(err) {
-        generate_prekey();
-        generate_prekey_lt('s');
+        //generate_prekey();
+        //generate_prekey_lt('s');
     }
 
     /**
@@ -481,7 +509,7 @@ void Client::run() {
     chan = Channel{std::move(sock)};
     initiate_connection();
 
-    upload_prekeys(); 
+    //upload_prekeys(); 
 
     std::vector<uint8_t> recv_byte;
     print_menu();
@@ -533,6 +561,8 @@ void Client::run() {
         }
     }
     t.join();
+    save_contacts();
+    save_keys();
 }
 
 
@@ -554,6 +584,9 @@ void Client::initiate_connection(){
         cry::generate_rsa_keys(ckey, ckey);
         util::write_file(pseudonym,ckey.export_all(),false);
     }
+
+    load_keys();
+    load_contacts();
    
     msg::ClientInit init{pseudonym, Rc, ckey.export_pub()};
     init.encrypt(spub);
@@ -653,11 +686,11 @@ uint16_t Client::generate_prekey() {
 
 
 void Client::generate_prekey_lt(char which) {
-    if (which == 'i' || which == 's') {
+    if (which == 'i' || which == 'b') {
         IKey.gen_pub_key();
     }
 
-    if (which == 's' || which == 'i') {
+    if (which == 's' || which == 'b') {
         SPKey.gen_pub_key();
     } 
 } 
@@ -753,4 +786,81 @@ std::array<uint8_t, 32> Client::compute_share_recv(std::array<uint8_t, 32>& IK, 
     }
     return cry::hash_sha(dh_con);
 }
+
+
+void Client::save_keys() {
+        util::write_file(pseudonym+"_IKey",IKey.get_key_binary(),false);
+        util::write_file(pseudonym+"_SPKey", SPKey.get_key_binary(),false);
+        
+        Encoder enc;
+        uint16_t num_opk = prekeys.size();
+        enc.put(num_opk);
+        for (auto& opk : prekeys) {
+            std::vector<uint8_t> key = opk.second.get_key_binary();
+            uint32_t size = key.size();
+            enc.put(opk.first);
+            enc.put(size);
+            enc.put(key);
+        }
+        util::write_file(pseudonym+"_OPKeys",enc.get(),false);
+    }
+
+
+void Client::load_keys() { 
+    try {
+        std::vector<uint8_t> data = util::read_file(pseudonym+"_IKey");
+        IKey.load_key_binary(data);
+    } catch (std::ios_base::failure& e) {
+        IKey.gen_pub_key();
+    }
+
+    try {
+        std::vector<uint8_t> data = util::read_file(pseudonym+"_SPKey");
+        SPKey.load_key_binary(data);
+    } catch (std::ios_base::failure& e) {    
+        SPKey.gen_pub_key();
+        }        
+        
+    try {
+        Decoder dec{util::read_file(pseudonym+"_OPKeys")};
+        uint16_t num_opk = dec.get_u16();
+        for (uint16_t i = 0; i < num_opk; i++) {
+            uint16_t id = dec.get_u16();
+            uint32_t size = dec.get_u32();
+            prekeys[id].gen_pub_key();
+            std::vector<uint8_t> data = dec.get_vec(size);
+            prekeys[id].load_key_binary(data);
+        }
+    } catch (std::ios_base::failure& e) {        
+        upload_prekeys(); 
+    }
+}
+
+
+void Client::save_contacts(){
+    Encoder enc;
+    enc.put((uint16_t) contacts.size());
+    for (auto& c: contacts ) {
+        enc.put((uint8_t) c.first.size());
+        enc.put(c.first.data());
+        enc.put(c.second);       
+    }
+    util::write_file(pseudonym+"_contacts",enc.get(),false);        
+}    
+
+
+void Client::load_contacts(){
+    try {
+        Decoder dec{util::read_file(pseudonym+"_contacts")};
+        uint16_t size = dec.get_u16();
+        for (uint16_t i = 0; i < size; i++) {
+            uint8_t len = dec.get_u8();
+            std::string s = dec.get_str((size_t) len);
+            contacts[s] = dec.get_arr<32>();
+        }
+    } catch (std::ios_base::failure& e) {        
+    }
+}
+
+
 #endif
