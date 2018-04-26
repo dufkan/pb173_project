@@ -212,6 +212,7 @@ TEST_CASE("ECDH generating public and private keys") {
     REQUIRE(k.is_correct_priv(k));
 }
 
+
 TEST_CASE("ECDH - share secret") {
     cry::ECKey k;
     cry::ECKey l;
@@ -228,8 +229,26 @@ TEST_CASE("ECDH - share secret") {
     k.compute_shared();
     l.compute_shared();
 
+    REQUIRE(l != k );
     REQUIRE(k.compare_shared(*(l.get())));
+    
     std::array<uint8_t,32> sk = k.get_shared();
     std::array<uint8_t,32> sl = l.get_shared();
     REQUIRE(sk==sl);
+}
+
+
+TEST_CASE("ECKey - save in file") {
+    std::string fname = "eckey"; 
+    cry::ECKey k;
+    cry::ECKey new_k;
+    k.gen_pub_key();
+
+    k.save_key_in_file("infile");
+    new_k.load_key_from_file("infile");
+    
+    CHECK(new_k.has_priv());
+    CHECK(new_k.has_pub());
+    CHECK(mbedtls_ecp_check_pubkey(&new_k.get()->grp,&new_k.get()->Q)==0);
+    REQUIRE( k == new_k);    
 }

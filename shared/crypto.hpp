@@ -19,6 +19,7 @@
 #include "mbedtls/x509.h"
 
 #include "codec.hpp"
+#include "util.hpp"
 
 
 namespace cry {
@@ -115,7 +116,7 @@ public :
         mbedtls_ecp_group_load(&ctx.grp, MBEDTLS_ECP_DP_CURVE25519);
         mbedtls_ecp_copy(&ctx.Q, &other.ctx.Q);
         mbedtls_ecp_group_copy(&ctx.grp, &other.ctx.grp);
-        return *this;
+        return *this; //TODO nepotrebuju nahodou kopirovat i d?
     }
 
 
@@ -175,6 +176,36 @@ public :
 
     bool is_correct_priv(const ECKey& other) const;
 
+
+    bool compare_point(mbedtls_ecp_point* p, mbedtls_ecp_point* q) {
+        return !mbedtls_ecp_point_cmp(p,q);
+    }
+/*
+    bool compare(const ECKey& k) {
+        return (mbedtls_mpi_cmp_mpi(&ctx.d,&k.ctx.d)==0);
+}*/
+
+    friend bool operator==(const ECKey& l, const ECKey& r) {
+        return (mbedtls_ecp_point_cmp(&l.ctx.Q,&r.ctx.Q)==0)&&(mbedtls_mpi_cmp_mpi(&l.ctx.d,&r.ctx.d)==0);
+    }
+
+    friend bool operator!=(const ECKey& l, const ECKey& r) {
+        return !(l == r);
+    }
+    
+    /**
+     * Save parametrs from ECKey in file
+     *
+     * @param fname Name of th file
+     */
+    void save_key_in_file (std::string fname) const;
+
+    /**
+     * Load params to ECKey from file
+     *
+     * @param fname Name of the file
+     */ 
+    void load_key_from_file (std::string fname);
 
 }; //ECKey
 
@@ -455,6 +486,36 @@ bool cry::ECKey::is_correct_priv(const ECKey& other) const {
     mbedtls_ecp_keypair_free(&pub);
     return has_priv() && ret;
 }
+
+
+void cry::ECKey::save_key_in_file(std::string fname) const {
+    Encoder enc;
+    std::vector<uint8_t> buf;
+    size_t bsize = mbedtls_mpi_size(&ctx.grp.P);
+
+    buf.resize(2*bsize+1);
+    mbedtls_ecp_point_write_binary(&ctx.grp, &ctx.Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &bsize, buf.data(), buf.size());
+    enc.put(static_cast<uint32_t>(bsize));
+    enc.put(buf);
+    buf.resize(32);
+    mbedtls_mpi_write_binary(&ctx.d,buf.data(),32);
+    enc.put(buf);
+    util::write_file(fname,enc.get(), false);
+}
+
+
+void cry::ECKey::load_key_from_file (std::string fname) {
+    Decoder dec{util::read_file(fname)};
+    size_t len = static_cast<uint32_t>(dec.get_u32());
+    
+    std::vector<uint8_t> point = dec.get_vec(len);
+    mbedtls_ecp_point_read_binary(&ctx.grp, &ctx.Q, point.data(), len);
+    point.resize(32);
+    point = dec.get_vec(32);
+    mbedtls_mpi_read_binary(&ctx.d, point.data(), 32);
+}
+
+
 
 
 void cry::pad(std::vector<uint8_t>& data, uint8_t bsize) {
