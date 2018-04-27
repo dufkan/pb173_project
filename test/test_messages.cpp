@@ -29,7 +29,7 @@ TEST_CASE("Message ClientInit") {
     CHECK(restored.key == key);
     CHECK(restored.pseudonym == pseudonym);
     CHECK(restored.Rc == Rc);
-
+    CHECK(restored.check_mac());
     CHECK(original == restored);
 }
 

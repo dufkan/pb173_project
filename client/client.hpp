@@ -509,7 +509,7 @@ void Client::run() {
     chan = Channel{std::move(sock)};
     initiate_connection();
 
-    //upload_prekeys(); 
+    upload_prekeys(); 
 
     std::vector<uint8_t> recv_byte;
     print_menu();
@@ -599,7 +599,7 @@ void Client::initiate_connection(){
         /*trouble with integrity*/
         err << "Problem with integrity, MAC of sresp" << std::endl;
         return; //TODO handle with excetion
-    }
+    } 
     auto [Rs, verify_Rc] = sresp.get();
 
     if(verify_Rc != Rc) {
@@ -819,7 +819,7 @@ void Client::load_keys() {
         SPKey.load_key_binary(data);
     } catch (std::ios_base::failure& e) {    
         SPKey.gen_pub_key();
-        }        
+    }        
         
     try {
         Decoder dec{util::read_file(pseudonym+"_OPKeys")};
@@ -832,7 +832,6 @@ void Client::load_keys() {
             prekeys[id].load_key_binary(data);
         }
     } catch (std::ios_base::failure& e) {        
-        upload_prekeys(); 
     }
 }
 
