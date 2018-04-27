@@ -266,7 +266,6 @@ void Server::connection_handler() {
 #endif
 
             Channel chan{std::move(sock)};
-            std::cout << "chan(std::move)" <<std::endl;
         //std::vector<uint8_t> recv_byte = chan.recv();
 
             auto uniq_init = message_deserializer(chan.recv());
