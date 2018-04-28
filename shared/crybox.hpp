@@ -140,35 +140,56 @@ public:
  * DoubleRatchet Crybox
  */
 class DRBox : public CryBox {
-    std::array<uint8_t, 32> root;
-    std::array<uint8_t, 32> send;
-    std::array<uint8_t, 32> recv;
-    cry::ECKey key;
+    std::array<uint8_t, 32> RK;
+    std::array<uint8_t, 32> CKs;
+    std::array<uint8_t, 32> CKr;
+    cry::ECKey DHs;
+    cry::ECKey DHr;
+    size_t Ns = 0;
+    size_t Nr = 0;
+    size_t PN = 0;
+    // MKSKIPPED
 
-    static std::pair<std::array<uint8_t, 32>, std::array<uint8_t, 32>> chain(std::array<uint8_t, 32> key, std::array<uint8_t, 32> input) {
+    static std::pair<std::array<uint8_t, 32>, std::array<uint8_t, 32>> kdf_RK(const std::array<uint8_t, 32>& k, const std::array<uint8_t, 32>& input) {
         std::vector<uint8_t> concat;
-        concat.insert(concat.end(), key.begin(), key.end());
+        concat.insert(concat.end(), k.begin(), k.end());
         concat.insert(concat.end(), input.begin(), input.end());
         auto newkey = cry::hash_sha(concat);
         return {newkey, cry::hash_sha(newkey)};
     }
 
+    static std::pair<std::array<uint8_t, 32>, std::array<uint8_t, 32>> kdf_CK(const std::array<uint8_t, 32>& k) {
+        auto newkey = cry::hash_sha(k);
+        return {newkey, cry::hash_sha(newkey)};
+    }
+
 public:
-    DRBox(std::array<uint8_t, 32> root, cry::ECKey key)
-        : root(root), key(key) {
-        std::iota(send.begin(), send.end(), 0); // tmp
-        std::iota(recv.begin(), recv.end(), 0); // tmp
+    /**
+     * Constructs DRBox of the client initiating the communication
+     */
+    DRBox(std::array<uint8_t, 32> SK, std::array<uint8_t, 32> key) {
+        DHs.gen_pub_key();
+        //DHr = bob_dh_public_key
+        //std::tie(RK, CKs) = kdf_RK(SK, DH(DHs, DHr));
+    }
+
+    /**
+     * Constructs DRBox of the client being contacted
+     */
+    DRBox(std::array<uint8_t, 32> SK, cry::ECKey DHs): RK(SK), DHs(DHs) {
+        std::iota(CKs.begin(), CKs.end(), 0); // tmp
+        std::iota(CKr.begin(), CKr.end(), 0); // tmp
     }
 
     std::vector<uint8_t> encrypt(std::vector<uint8_t> data) override {
-        auto [newkey, enckey] = chain(send, {}); // symmetric ratchet
-        send = std::move(newkey);
+        auto [newkey, enckey] = kdf_CK(CKs); // symmetric ratchet
+        CKs = std::move(newkey);
         return cry::encrypt_aes(data, {}, enckey);
     }
 
     std::vector<uint8_t> decrypt(std::vector<uint8_t> data) override {
-        auto [newkey, deckey] = chain(recv, {}); // symmetric ratchet
-        recv = std::move(newkey);
+        auto [newkey, deckey] = kdf_CK(CKr); // symmetric ratchet
+        CKr = std::move(newkey);
         return cry::decrypt_aes(data, {}, deckey);
     }
 };
