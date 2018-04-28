@@ -158,3 +158,53 @@ TEST_CASE("SeqBox multiple") {
         REQUIRE(box.decrypt(enc) == mbox.decrypt(abox.decrypt(enc)));
     }
 }
+
+TEST_CASE("DRBox"){
+    std::array<uint8_t, 32> root;
+    cry::ECKey akey;
+    akey.gen_pub_key();
+    cry::ECKey bkey;
+    bkey.gen_pub_key();
+
+    DRBox a{root, akey};
+    DRBox b{root, bkey};
+
+    SECTION("empty") {
+        std::vector<uint8_t> data = {};
+        REQUIRE(b.decrypt(a.encrypt(data)) == data);
+        REQUIRE(a.decrypt(b.encrypt(data)) == data);
+        REQUIRE(a.decrypt(b.encrypt(data)) == data);
+        REQUIRE(b.decrypt(a.encrypt(data)) == data);
+
+        a.decrypt(a.encrypt(a.encrypt(data))); // break it
+
+        REQUIRE(a.decrypt(b.encrypt(data)) != data);
+        REQUIRE(b.decrypt(a.encrypt(data)) != data);
+    }
+    SECTION("some") {
+        std::vector<uint8_t> data = {'T', 'e', 's', 't', ' ', 0x00, 0x01, 0x02, 0x03, 0x04};
+        REQUIRE(b.decrypt(a.encrypt(data)) == data);
+        REQUIRE(a.decrypt(b.encrypt(data)) == data);
+        REQUIRE(a.decrypt(b.encrypt(data)) == data);
+        REQUIRE(b.decrypt(a.encrypt(data)) == data);
+
+        a.decrypt(a.encrypt(a.encrypt(data))); // break it
+
+        REQUIRE(a.decrypt(b.encrypt(data)) != data);
+        REQUIRE(b.decrypt(a.encrypt(data)) != data);
+    }
+    SECTION("a lot") {
+        std::vector<uint8_t> data;
+        data.resize(1024 * 1024);
+        std::iota(data.begin(), data.end(), 0);
+        REQUIRE(b.decrypt(a.encrypt(data)) == data);
+        REQUIRE(a.decrypt(b.encrypt(data)) == data);
+        REQUIRE(a.decrypt(b.encrypt(data)) == data);
+        REQUIRE(b.decrypt(a.encrypt(data)) == data);
+
+        a.decrypt(a.encrypt(a.encrypt(data))); // break it
+
+        REQUIRE(a.decrypt(b.encrypt(data)) != data);
+        REQUIRE(b.decrypt(a.encrypt(data)) != data);
+    }
+}

@@ -1,5 +1,5 @@
 CXXSTD=17
-CXXFLAGS=-Wall -Wextra -DASIO_STANDALONE
+CXXFLAGS=-Wall -Wextra -g -DASIO_STANDALONE
 LINK=libs/mbedtls/library/libmbedcrypto.a -lpthread -lstdc++fs
 INCLUDE_DIRS=-Ilibs/mbedtls/include/ -Ilibs/asio/include/
 
