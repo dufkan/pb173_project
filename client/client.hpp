@@ -18,6 +18,9 @@
 #include "../shared/codec.hpp"
 #include "../shared/util.hpp"
 
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+
 class Client {
 #ifdef TESTMODE
 public:
@@ -509,7 +512,7 @@ void Client::run() {
     chan = Channel{std::move(sock)};
     initiate_connection();
 
-    //upload_prekeys(); 
+    upload_prekeys(); 
 
     std::vector<uint8_t> recv_byte;
     print_menu();
@@ -578,11 +581,11 @@ void Client::initiate_connection(){
     cry::RSAKey ckey;
     
     try {
-        std::vector<uint8_t> file_ckey = util::read_file(pseudonym);
+        std::vector<uint8_t> file_ckey = util::read_file(pseudonym+".rsa");
         ckey.import(file_ckey);    
     } catch (std::ios_base::failure& e) {
         cry::generate_rsa_keys(ckey, ckey);
-        util::write_file(pseudonym,ckey.export_all(),false);
+        util::write_file(pseudonym+".rsa",ckey.export_all(),false);
     }
 
     load_keys();
@@ -599,7 +602,7 @@ void Client::initiate_connection(){
         /*trouble with integrity*/
         err << "Problem with integrity, MAC of sresp" << std::endl;
         return; //TODO handle with excetion
-    }
+    } 
     auto [Rs, verify_Rc] = sresp.get();
 
     if(verify_Rc != Rc) {
@@ -789,8 +792,10 @@ std::array<uint8_t, 32> Client::compute_share_recv(std::array<uint8_t, 32>& IK, 
 
 
 void Client::save_keys() {
-        util::write_file(pseudonym+"_IKey",IKey.get_key_binary(),false);
-        util::write_file(pseudonym+"_SPKey", SPKey.get_key_binary(),false);
+        if(!fs::is_directory(pseudonym))
+            fs::create_directory(pseudonym);
+        util::write_file(pseudonym+"/IKey",IKey.get_key_binary(),false);
+        util::write_file(pseudonym+"/SPKey", SPKey.get_key_binary(),false);
         
         Encoder enc;
         uint16_t num_opk = prekeys.size();
@@ -802,27 +807,27 @@ void Client::save_keys() {
             enc.put(size);
             enc.put(key);
         }
-        util::write_file(pseudonym+"_OPKeys",enc.get(),false);
+        util::write_file(pseudonym+"/OPKeys",enc.get(),false);
     }
 
 
 void Client::load_keys() { 
     try {
-        std::vector<uint8_t> data = util::read_file(pseudonym+"_IKey");
+        std::vector<uint8_t> data = util::read_file(pseudonym+"/IKey");
         IKey.load_key_binary(data);
     } catch (std::ios_base::failure& e) {
         IKey.gen_pub_key();
     }
 
     try {
-        std::vector<uint8_t> data = util::read_file(pseudonym+"_SPKey");
+        std::vector<uint8_t> data = util::read_file(pseudonym+"/SPKey");
         SPKey.load_key_binary(data);
     } catch (std::ios_base::failure& e) {    
         SPKey.gen_pub_key();
-        }        
+    }        
         
     try {
-        Decoder dec{util::read_file(pseudonym+"_OPKeys")};
+        Decoder dec{util::read_file(pseudonym+"/OPKeys")};
         uint16_t num_opk = dec.get_u16();
         for (uint16_t i = 0; i < num_opk; i++) {
             uint16_t id = dec.get_u16();
@@ -832,12 +837,13 @@ void Client::load_keys() {
             prekeys[id].load_key_binary(data);
         }
     } catch (std::ios_base::failure& e) {        
-        upload_prekeys(); 
     }
 }
 
 
 void Client::save_contacts(){
+    if(!fs::is_directory(pseudonym))
+        fs::create_directory(pseudonym);
     Encoder enc;
     enc.put((uint16_t) contacts.size());
     for (auto& c: contacts ) {
@@ -845,13 +851,13 @@ void Client::save_contacts(){
         enc.put(c.first.data());
         enc.put(c.second);       
     }
-    util::write_file(pseudonym+"_contacts",enc.get(),false);        
+    util::write_file(pseudonym+"/contacts",enc.get(),false);        
 }    
 
 
 void Client::load_contacts(){
     try {
-        Decoder dec{util::read_file(pseudonym+"_contacts")};
+        Decoder dec{util::read_file(pseudonym+"/contacts")};
         uint16_t size = dec.get_u16();
         for (uint16_t i = 0; i < size; i++) {
             uint8_t len = dec.get_u8();
