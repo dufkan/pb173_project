@@ -50,6 +50,11 @@ public:
     void prepare_key();
 
     /**
+     * Load client prekeys
+     */
+    void prepare_prekeys();
+
+    /**
      * Load client key from local file
      *
      * @return Byte representation of the key; or an empty vector if file does not exist
@@ -237,7 +242,7 @@ void Server::sync_connections() {
 
 Server::Server() {
     prepare_key();
-    // TODO prepare_prekeys();
+    prepare_prekeys();
 }
 
 void Server::connection_handler() {
@@ -498,5 +503,10 @@ std::tuple<std::array<uint8_t, 32>, std::array<uint8_t, 32>, std::vector<std::pa
         OPKs.push_back({id, OPK});
     }
     return {IK, SPK, std::move(OPKs)};
+}
+
+void Server::prepare_prekeys() {
+    for(auto& c: fs::directory_iterator("prekeys"))
+        prekeys[c.path().filename()] = load_prekeys(c.path().filename());
 }
 #endif
