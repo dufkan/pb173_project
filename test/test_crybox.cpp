@@ -159,14 +159,15 @@ TEST_CASE("SeqBox multiple") {
     }
 }
 
+
 TEST_CASE("DRBox"){
     std::array<uint8_t, 32> root;
     cry::ECKey akey;
     akey.gen_pub_key();
     cry::ECKey bkey;
     bkey.gen_pub_key();
-
-    DRBox a{root, akey};
+    
+    DRBox a{root, bkey.get_bin_q()};
     DRBox b{root, bkey};
 
     SECTION("empty") {
@@ -175,11 +176,12 @@ TEST_CASE("DRBox"){
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
         REQUIRE(b.decrypt(a.encrypt(data)) == data);
-
+        
+        REQUIRE(a.RK != b.RK);
         a.decrypt(a.encrypt(a.encrypt(data))); // break it
 
-        REQUIRE(a.decrypt(b.encrypt(data)) != data);
-        REQUIRE(b.decrypt(a.encrypt(data)) != data);
+        REQUIRE(a.decrypt(b.encrypt(data)) == data);
+        REQUIRE(b.decrypt(a.encrypt(data)) == data);
     }
     SECTION("some") {
         std::vector<uint8_t> data = {'T', 'e', 's', 't', ' ', 0x00, 0x01, 0x02, 0x03, 0x04};
@@ -187,11 +189,12 @@ TEST_CASE("DRBox"){
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
         REQUIRE(b.decrypt(a.encrypt(data)) == data);
-
+        
+        REQUIRE(a.RK != b.RK);
         a.decrypt(a.encrypt(a.encrypt(data))); // break it
 
-        REQUIRE(a.decrypt(b.encrypt(data)) != data);
-        REQUIRE(b.decrypt(a.encrypt(data)) != data);
+        REQUIRE(a.decrypt(b.encrypt(data)) == data);
+        REQUIRE(b.decrypt(a.encrypt(data)) == data);
     }
     SECTION("a lot") {
         std::vector<uint8_t> data;
@@ -202,9 +205,10 @@ TEST_CASE("DRBox"){
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
         REQUIRE(b.decrypt(a.encrypt(data)) == data);
 
+        REQUIRE(a.RK != b.RK);
         a.decrypt(a.encrypt(a.encrypt(data))); // break it
 
-        REQUIRE(a.decrypt(b.encrypt(data)) != data);
-        REQUIRE(b.decrypt(a.encrypt(data)) != data);
+        REQUIRE(a.decrypt(b.encrypt(data)) == data);
+        REQUIRE(b.decrypt(a.encrypt(data)) == data);
     }
 }

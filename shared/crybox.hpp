@@ -136,19 +136,30 @@ public:
     }
 };
 
+
+enum class DHKey {
+    WithKey,
+    WithoutKey
+};
+
+
 /**
  * DoubleRatchet Crybox
  */
 class DRBox : public CryBox {
-    std::array<uint8_t, 32> RK;
-    std::array<uint8_t, 32> CKs;
-    std::array<uint8_t, 32> CKr;
-    cry::ECKey DHs;
-    cry::ECKey DHr;
-    size_t Ns = 0;
-    size_t Nr = 0;
-    size_t PN = 0;
-    // MKSKIPPED
+#ifdef TESTMODE
+public:
+#endif
+    std::array<uint8_t, 32> RK;     /*Root Key*/
+    std::array<uint8_t, 32> CKs;    /*Chain Key for sending*/
+    std::array<uint8_t, 32> CKr;    /*Chain Key for receiving*/
+    cry::ECKey DHs;     /*Ratchet key pair - sending* & receiving/
+
+    size_t Ns = 0;      /*Message numbers for sending*/
+    size_t Nr = 0;      /*Message numbers for receiving*/
+    size_t PN = 0;      /*Number of message in previous sending chain*/
+    bool pubkey_to_send = false;
+    // MKSKIPPED        /*Skipped-over message keys*/
 
     static std::pair<std::array<uint8_t, 32>, std::array<uint8_t, 32>> kdf_RK(const std::array<uint8_t, 32>& k, const std::array<uint8_t, 32>& input) {
         std::vector<uint8_t> concat;
@@ -163,34 +174,70 @@ class DRBox : public CryBox {
         return {newkey, cry::hash_sha(newkey)};
     }
 
+    void DHRatchet(std::array<uint8_t, 32> pub_key) {
+        PN = Ns; //promyslet jeste cislovani, nedat tam radsi +Ns ??
+        Ns = 0;
+        Nr = 0;
+        DHs.load_bin_qp(pub_key);
+        DHs.compute_shared();
+        std::tie(RK, CKr) = kdf_RK(RK, DHs.get_shared());
+        DHs.gen_pub_key();
+        DHs.compute_shared();
+        pubkey_to_send = true;
+        std::tie(RK, CKs) = kdf_RK(RK, DHs.get_shared());
+    }
+
 public:
     /**
      * Constructs DRBox of the client initiating the communication
      */
-    DRBox(std::array<uint8_t, 32> SK, std::array<uint8_t, 32> key) {
+    DRBox(std::array<uint8_t, 32> SK, std::array<uint8_t, 32> pub_key) {
         DHs.gen_pub_key();
-        //DHr = bob_dh_public_key
-        //std::tie(RK, CKs) = kdf_RK(SK, DH(DHs, DHr));
+        DHs.load_bin_qp(pub_key);
+        DHs.compute_shared();
+        std::tie(RK,CKs) = kdf_RK(SK,DHs.get_shared());
+        CKr = {};
+        
+        pubkey_to_send = true;
     }
 
     /**
      * Constructs DRBox of the client being contacted
      */
-    DRBox(std::array<uint8_t, 32> SK, cry::ECKey DHs): RK(SK), DHs(DHs) {
-        std::iota(CKs.begin(), CKs.end(), 0); // tmp
-        std::iota(CKr.begin(), CKr.end(), 0); // tmp
+    DRBox(std::array<uint8_t, 32> SK, cry::ECKey DHs): RK(SK), DHs(DHs) { 
+        CKr = {}; CKs = {}; 
     }
 
     std::vector<uint8_t> encrypt(std::vector<uint8_t> data) override {
+        Encoder enc;
+        if (pubkey_to_send) {
+            enc.put(static_cast<uint8_t>(DHKey::WithKey));
+            enc.put(DHs.get_bin_q());
+            pubkey_to_send = false;
+        } else {
+            enc.put(static_cast<uint8_t>(DHKey::WithoutKey));
+        }
         auto [newkey, enckey] = kdf_CK(CKs); // symmetric ratchet
         CKs = std::move(newkey);
-        return cry::encrypt_aes(data, {}, enckey);
+        //enc.put(Ns) - add number
+        enc.put(cry::encrypt_aes(data, {}, enckey));
+        return enc.move();
     }
 
     std::vector<uint8_t> decrypt(std::vector<uint8_t> data) override {
+        Decoder dec{data};
+        DHKey is_there = static_cast<DHKey>(dec.get_u8());
+        
+        if (is_there == DHKey::WithKey) {
+            DHRatchet(dec.get_arr<32>());
+        } else if (is_there != DHKey::WithoutKey) {
+            std::cerr << "DRBox not WithKey, not WithoutKey " << std::endl;
+            //TODO exception asi
+        }
+//Nr = dec.get_()
         auto [newkey, deckey] = kdf_CK(CKr); // symmetric ratchet
         CKr = std::move(newkey);
-        return cry::decrypt_aes(data, {}, deckey);
+        return cry::decrypt_aes(dec.get_vec(), {}, deckey);
     }
 };
 #endif

@@ -94,6 +94,9 @@ public:
 
 
 class ECKey {
+#ifdef TESTMODE
+public:
+#endif
     mbedtls_ecdh_context ctx;
 
 public : 
@@ -106,7 +109,7 @@ public :
         mbedtls_ecdh_init(&ctx);
         mbedtls_ecp_copy(&ctx.Q, &other.ctx.Q);
         mbedtls_ecp_group_load(&ctx.grp, MBEDTLS_ECP_DP_CURVE25519);
-        mbedtls_ecp_group_copy(&ctx.grp, &other.ctx.grp);
+        mbedtls_mpi_copy(&ctx.d, &other.ctx.d);
     }
 
 
@@ -115,7 +118,7 @@ public :
         mbedtls_ecdh_init(&ctx);
         mbedtls_ecp_group_load(&ctx.grp, MBEDTLS_ECP_DP_CURVE25519);
         mbedtls_ecp_copy(&ctx.Q, &other.ctx.Q);
-        mbedtls_ecp_group_copy(&ctx.grp, &other.ctx.grp);
+        mbedtls_mpi_copy(&ctx.d, &other.ctx.d);
         return *this; //TODO nepotrebuju nahodou kopirovat i d?
     }
 
