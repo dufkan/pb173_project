@@ -182,6 +182,11 @@ TEST_CASE("DRBox"){
 
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
         REQUIRE(b.decrypt(a.encrypt(data)) == data);
+
+        b.decrypt(b.encrypt(data));        //brake it harder
+
+        REQUIRE(a.decrypt(b.encrypt(data)) != data);
+        REQUIRE(b.decrypt(a.encrypt(data)) != data);
     }
     SECTION("some") {
         std::vector<uint8_t> data = {'T', 'e', 's', 't', ' ', 0x00, 0x01, 0x02, 0x03, 0x04};
@@ -195,6 +200,12 @@ TEST_CASE("DRBox"){
 
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
         REQUIRE(b.decrypt(a.encrypt(data)) == data);
+
+        b.decrypt(b.encrypt(data));        //brake it harder
+        
+        REQUIRE(a.decrypt(b.encrypt(data)) != data);
+        REQUIRE(b.decrypt(a.encrypt(data)) != data);
+
     }
     SECTION("a lot") {
         std::vector<uint8_t> data;
@@ -210,5 +221,10 @@ TEST_CASE("DRBox"){
 
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
         REQUIRE(b.decrypt(a.encrypt(data)) == data);
-    }
+        
+        b.decrypt(b.encrypt(data));        //brake it harder
+
+        REQUIRE(a.decrypt(b.encrypt(data)) != data);
+        REQUIRE(b.decrypt(a.encrypt(data)) != data);
+}
 }

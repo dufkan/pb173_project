@@ -153,7 +153,7 @@ public:
     std::array<uint8_t, 32> RK;     /*Root Key*/
     std::array<uint8_t, 32> CKs;    /*Chain Key for sending*/
     std::array<uint8_t, 32> CKr;    /*Chain Key for receiving*/
-    cry::ECKey DHs;     /*Ratchet key pair - sending* & receiving/
+    cry::ECKey DHs;     /*Ratchet key pair - sending* & receiving*/
 
     size_t Ns = 0;      /*Message numbers for sending*/
     size_t Nr = 0;      /*Message numbers for receiving*/
@@ -161,6 +161,14 @@ public:
     bool pubkey_to_send = false;
     // MKSKIPPED        /*Skipped-over message keys*/
 
+
+    /**
+     * Key Derivation Function for Ratchet key
+     *
+     * @param k - The (root key) key used to derive new keys
+     * @param input - Input (public key from other side) used to derive new keys
+     * @return Two keys, new RK and CK
+     */
     static std::pair<std::array<uint8_t, 32>, std::array<uint8_t, 32>> kdf_RK(const std::array<uint8_t, 32>& k, const std::array<uint8_t, 32>& input) {
         std::vector<uint8_t> concat;
         concat.insert(concat.end(), k.begin(), k.end());
@@ -169,11 +177,24 @@ public:
         return {newkey, cry::hash_sha(newkey)};
     }
 
+
+    /**
+     * Key Derivation Function for Chain key
+     *
+     * @param k - CK used in deriving
+     * @return Two keys, new CK and key for encrypting/decrypting
+     */
     static std::pair<std::array<uint8_t, 32>, std::array<uint8_t, 32>> kdf_CK(const std::array<uint8_t, 32>& k) {
         auto newkey = cry::hash_sha(k);
         return {newkey, cry::hash_sha(newkey)};
     }
 
+
+    /**
+     * Ratchet with generating new EC key pair and computing new shared secret key, RK
+     *
+     * @param pub_key - Public key of other side, used for ECDH
+     */ 
     void DHRatchet(std::array<uint8_t, 32> pub_key) {
         PN = Ns; //promyslet jeste cislovani, nedat tam radsi +Ns ??
         Ns = 0;
@@ -190,6 +211,9 @@ public:
 public:
     /**
      * Constructs DRBox of the client initiating the communication
+     *
+     * @param SK - Shared secret key
+     * @param pub_key - Public key of other side
      */
     DRBox(std::array<uint8_t, 32> SK, std::array<uint8_t, 32> pub_key) {
         DHs.gen_pub_key();
@@ -203,11 +227,22 @@ public:
 
     /**
      * Constructs DRBox of the client being contacted
+     *
+     * @param SK - Shared secret key
+     * @param DHs - ECKey, other side has its public key
      */
     DRBox(std::array<uint8_t, 32> SK, cry::ECKey DHs): RK(SK), DHs(DHs) { 
         CKr = {}; CKs = {}; 
     }
 
+
+    /**
+     * Encrypting message
+     * if a public key should be send, then insert it to the message
+     *
+     * @param data - data to encrypt
+     * @return vector of encrypted data (and new public key)
+     */
     std::vector<uint8_t> encrypt(std::vector<uint8_t> data) override {
         Encoder enc;
         if (pubkey_to_send) {
@@ -224,6 +259,14 @@ public:
         return enc.move();
     }
 
+
+    /**
+     * Decrypting message
+     * if a new public key is received, then DHratchet is called
+     *
+     * @param data - data to be decrypt
+     * @return encrypted data (without new public key)
+     */  
     std::vector<uint8_t> decrypt(std::vector<uint8_t> data) override {
         Decoder dec{data};
         DHKey is_there = static_cast<DHKey>(dec.get_u8());
@@ -234,7 +277,8 @@ public:
             std::cerr << "DRBox not WithKey, not WithoutKey " << std::endl;
             //TODO exception asi
         }
-//Nr = dec.get_()
+        
+        //Nr = dec.get_()
         auto [newkey, deckey] = kdf_CK(CKr); // symmetric ratchet
         CKr = std::move(newkey);
         return cry::decrypt_aes(dec.get_vec(), {}, deckey);
