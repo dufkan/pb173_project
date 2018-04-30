@@ -58,11 +58,12 @@ public:
     }
 };
 
-class Decoder {
+template<typename C>
+class TDecoder {
 #ifdef TESTMODE
 public:
 #endif
-    std::vector<uint8_t> data; // TODO swap for cyclic buffer or some better data structure
+    C data; // TODO swap for cyclic buffer or some better data structure
     size_t i = 0;
 
     void check_read(size_t len) {
@@ -71,8 +72,8 @@ public:
     }
 
 public:
-    Decoder() = default;
-    Decoder(std::vector<uint8_t> data): data(data) {}
+    TDecoder() = default;
+    TDecoder(C data): data(data) {}
 
     void append(const std::vector<uint8_t>& new_data) {
         data.insert(std::end(data), std::begin(new_data), std::end(new_data));
@@ -136,5 +137,8 @@ public:
         return data.size() - i;
     }
 };
+
+using Decoder = TDecoder<std::vector<uint8_t>>;
+using RefDecoder = TDecoder<std::vector<uint8_t>&>;
 
 #endif
