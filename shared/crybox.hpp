@@ -3,6 +3,9 @@
 
 #include "crypto.hpp"
 #include <numeric>
+#include <vector>
+#include <map>
+#include <array>
 
 /**
  * Interface for accessing CryBox
@@ -139,7 +142,7 @@ public:
 
 enum class DHKey {
     WithKey,
-    WithoutKey
+    WithoutKey,
 };
 
 
@@ -159,7 +162,7 @@ public:
     uint16_t Nr = 0;      /*Message numbers for receiving*/
     uint16_t PN = 0;      /*Number of message in previous sending chain*/
     bool pubkey_to_send = false;
-    // MKSKIPPED        /*Skipped-over message keys*/
+    std::map<uint16_t, std::array<uint8_t, 32>> SKIPPED;  /*Skipped-over message keys*/
 
 
     /**
@@ -227,6 +230,7 @@ public:
         }
         e.put(static_cast<uint16_t>(PN));
         e.put(static_cast<uint16_t>(N));
+        return e.move();
     }
 
     /**
@@ -260,7 +264,6 @@ public:
         DHs.compute_shared();
         std::tie(RK,CKs) = kdf_RK(SK,DHs.get_shared());
         CKr = {};
-        
         pubkey_to_send = true;
     }
 
@@ -311,11 +314,29 @@ public:
      */
     std::vector<uint8_t> decrypt(std::vector<uint8_t> data) override {
         auto [key, PN, N] = parse_header(data);
+        if(N > Nr + 1) { // Skipped
+            if(key) {
+                SKIPPED = {};
+                while(Nr++ != PN) {
+                    std::tie(CKr, SKIPPED[Nr]) = kdf_CK(CKr);
+                }
+                Nr = 0;
+            }
+            else {
+                while(Nr++ != N + 1) {
+                    std::tie(CKr, SKIPPED[Nr]) = kdf_CK(CKr);
+                }
+            }
+        }
+        else if(N < Nr + 1) { // Received skipped
+            return cry::decrypt_aes(data, {}, SKIPPED[N]);
+        }
         if(key)
             DHRatchet(*key);
 
         auto [newkey, deckey] = kdf_CK(CKr);
         CKr = std::move(newkey);
+        ++Nr;
 
         return cry::decrypt_aes(data, {}, deckey);
     }
