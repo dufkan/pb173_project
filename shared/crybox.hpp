@@ -155,9 +155,9 @@ public:
     std::array<uint8_t, 32> CKr;    /*Chain Key for receiving*/
     cry::ECKey DHs;     /*Ratchet key pair - sending* & receiving*/
 
-    size_t Ns = 0;      /*Message numbers for sending*/
-    size_t Nr = 0;      /*Message numbers for receiving*/
-    size_t PN = 0;      /*Number of message in previous sending chain*/
+    uint16_t Ns = 0;      /*Message numbers for sending*/
+    uint16_t Nr = 0;      /*Message numbers for receiving*/
+    uint16_t PN = 0;      /*Number of message in previous sending chain*/
     bool pubkey_to_send = false;
     // MKSKIPPED        /*Skipped-over message keys*/
 
@@ -208,6 +208,45 @@ public:
         std::tie(RK, CKs) = kdf_RK(RK, DHs.get_shared());
     }
 
+    /**
+     * Create a header for message.
+     *
+     * @param key - Key, whose public part should be sent
+     * @param PN - Number of messages in previous chain
+     * @param N - Number of messages in current sending chain
+     * @return The message header.
+     */
+    static std::vector<uint8_t> create_header(std::optional<std::array<uint8_t, 32>> key, uint16_t PN, uint16_t N) {
+        Encoder e;
+        if (key) {
+            e.put(static_cast<uint8_t>(DHKey::WithKey));
+            e.put(*key);
+        }
+        else {
+            e.put(static_cast<uint8_t>(DHKey::WithoutKey));
+        }
+        e.put(static_cast<uint16_t>(PN));
+        e.put(static_cast<uint16_t>(N));
+    }
+
+    /**
+     * Parse a message header
+     *
+     * @param msg - The message
+     * @return Tripple of sending-side public key, number of messages in previous chain, and number of messages in current chain.
+     */
+    std::tuple<std::optional<std::array<uint8_t, 32>>, uint16_t, uint16_t> parse_header(std::vector<uint8_t>& msg) const {
+        RefDecoder d{msg};
+        auto tag = static_cast<DHKey>(d.get_u8());
+        std::optional<std::array<uint8_t, 32>> key;
+        if(tag == DHKey::WithKey)
+            key = d.get_arr<32>();
+        auto PN = d.get_u16();
+        auto N = d.get_u16();
+        d.cut();
+        return {key, PN, N};
+    }
+
 public:
     /**
      * Constructs DRBox of the client initiating the communication
@@ -244,19 +283,22 @@ public:
      * @return vector of encrypted data (and new public key)
      */
     std::vector<uint8_t> encrypt(std::vector<uint8_t> data) override {
-        Encoder enc;
-        if (pubkey_to_send) {
-            enc.put(static_cast<uint8_t>(DHKey::WithKey));
-            enc.put(DHs.get_bin_q());
-            pubkey_to_send = false;
-        } else {
-            enc.put(static_cast<uint8_t>(DHKey::WithoutKey));
-        }
-        auto [newkey, enckey] = kdf_CK(CKs); // symmetric ratchet
+        auto [newkey, enckey] = kdf_CK(CKs);
         CKs = std::move(newkey);
-        //enc.put(Ns) - add number
-        enc.put(cry::encrypt_aes(data, {}, enckey));
-        return enc.move();
+
+        std::optional<std::array<uint8_t, 32>> key;
+        if(pubkey_to_send) {
+            key = DHs.get_bin_q();
+            PN = Ns;
+            Ns = 0;
+        }
+        else {
+            ++Ns;
+        }
+        Encoder e;
+        e.put(create_header(key, PN, Ns));
+        e.put(cry::encrypt_aes(data, {}, enckey));
+        return e.move();
     }
 
 
@@ -264,24 +306,18 @@ public:
      * Decrypting message
      * if a new public key is received, then DHratchet is called
      *
-     * @param data - data to be decrypt
-     * @return encrypted data (without new public key)
-     */  
+     * @param data - data to be decrypted
+     * @return decrypted data (without new public key)
+     */
     std::vector<uint8_t> decrypt(std::vector<uint8_t> data) override {
-        Decoder dec{data};
-        DHKey is_there = static_cast<DHKey>(dec.get_u8());
-        
-        if (is_there == DHKey::WithKey) {
-            DHRatchet(dec.get_arr<32>());
-        } else if (is_there != DHKey::WithoutKey) {
-            std::cerr << "DRBox not WithKey, not WithoutKey " << std::endl;
-            //TODO exception asi
-        }
-        
-        //Nr = dec.get_()
-        auto [newkey, deckey] = kdf_CK(CKr); // symmetric ratchet
+        auto [key, PN, N] = parse_header(data);
+        if(key)
+            DHRatchet(*key);
+
+        auto [newkey, deckey] = kdf_CK(CKr);
         CKr = std::move(newkey);
-        return cry::decrypt_aes(dec.get_vec(), {}, deckey);
+
+        return cry::decrypt_aes(data, {}, deckey);
     }
 };
 #endif
