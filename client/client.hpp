@@ -681,7 +681,7 @@ uint16_t Client::generate_prekey() {
     uint16_t id;
     do {
         auto data = cry::get_random_data(sizeof(uint16_t));
-        std::copy(data.begin(), data.end(), &id);
+        std::copy(data.begin(), data.end(), reinterpret_cast<uint8_t*>(&id));
     } while(prekeys.find(id) != prekeys.end() && id != 0);
     prekeys[id].gen_pub_key();
     return id;
