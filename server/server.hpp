@@ -413,11 +413,11 @@ void Server::handle_send(const std::string& pseudonym, msg::Send msg) {
 }
 
 
-void Server::handle_error(msg::Message msg) {
+void Server::handle_error([[maybe_unused]] msg::Message msg) {
     std::cerr << "Got a message I cannot handle." << std::endl;
 }
 
-void Server::handle_message(const std::string& pseudonym, std::vector<uint8_t> msg) {
+void Server::handle_message(const std::string& pseudonym, [[maybe_unused]] std::vector<uint8_t> msg) {
     std::unique_ptr<msg::Message> deserialized_msg = message_deserializer(msg);
     switch(msg::type(msg)) {
         case msg::MessageType::Send:
@@ -446,7 +446,7 @@ void Server::handle_message(const std::string& pseudonym, std::vector<uint8_t> m
     }
 }
 
-void Server::handle_get_online(const std::string& pseudonym, msg::GetOnline msg) {
+void Server::handle_get_online(const std::string& pseudonym, [[maybe_unused]]  msg::GetOnline msg) {
     msg::RetOnline res{get_connected_users()};
     send_to(pseudonym, res.serialize());
 }

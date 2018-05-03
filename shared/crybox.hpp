@@ -140,11 +140,6 @@ public:
 };
 
 
-enum class DHKey {
-    WithKey,
-    WithoutKey,
-};
-
 
 /**
  * DoubleRatchet Crybox
@@ -162,8 +157,8 @@ public:
     uint16_t Nr = 0;      /*Message numbers for receiving*/
     uint16_t PN = 0;      /*Number of message in previous sending chain*/
     bool pubkey_to_send = false;
-    std::map<uint16_t, std::array<uint8_t, 32>> SKIPPED;  /*Skipped-over message keys*/
-
+    std::array<uint8_t, 32> pubkey;
+    std::map<std::pair<std::array<uint8_t, 32>, uint16_t>, std::array<uint8_t, 32>> SKIPPED;
 
     /**
      * Key Derivation Function for Ratchet key
@@ -199,9 +194,10 @@ public:
      * @param pub_key - Public key of other side, used for ECDH
      */ 
     void DHRatchet(std::array<uint8_t, 32> pub_key) {
-        PN = Ns; //promyslet jeste cislovani, nedat tam radsi +Ns ??
+        PN = Ns; 
         Ns = 0;
         Nr = 0;
+        pubkey = pub_key;
         DHs.load_bin_qp(pub_key);
         DHs.compute_shared();
         std::tie(RK, CKr) = kdf_RK(RK, DHs.get_shared());
@@ -211,6 +207,7 @@ public:
         std::tie(RK, CKs) = kdf_RK(RK, DHs.get_shared());
     }
 
+
     /**
      * Create a header for message.
      *
@@ -219,19 +216,14 @@ public:
      * @param N - Number of messages in current sending chain
      * @return The message header.
      */
-    static std::vector<uint8_t> create_header(std::optional<std::array<uint8_t, 32>> key, uint16_t PN, uint16_t N) {
+    static std::vector<uint8_t> create_header(std::array<uint8_t, 32> key, uint16_t PN, uint16_t N) {
         Encoder e;
-        if (key) {
-            e.put(static_cast<uint8_t>(DHKey::WithKey));
-            e.put(*key);
-        }
-        else {
-            e.put(static_cast<uint8_t>(DHKey::WithoutKey));
-        }
+        e.put(key);
         e.put(static_cast<uint16_t>(PN));
         e.put(static_cast<uint16_t>(N));
         return e.move();
     }
+
 
     /**
      * Parse a message header
@@ -239,12 +231,10 @@ public:
      * @param msg - The message
      * @return Tripple of sending-side public key, number of messages in previous chain, and number of messages in current chain.
      */
-    std::tuple<std::optional<std::array<uint8_t, 32>>, uint16_t, uint16_t> parse_header(std::vector<uint8_t>& msg) const {
+    std::tuple<std::array<uint8_t, 32>, uint16_t, uint16_t> parse_header(std::vector<uint8_t>& msg) const {
         RefDecoder d{msg};
-        auto tag = static_cast<DHKey>(d.get_u8());
-        std::optional<std::array<uint8_t, 32>> key;
-        if(tag == DHKey::WithKey)
-            key = d.get_arr<32>();
+        std::array<uint8_t, 32> key;
+        key = d.get_arr<32>();
         auto PN = d.get_u16();
         auto N = d.get_u16();
         d.cut();
@@ -260,6 +250,7 @@ public:
      */
     DRBox(std::array<uint8_t, 32> SK, std::array<uint8_t, 32> pub_key) {
         DHs.gen_pub_key();
+        pubkey = pub_key;
         DHs.load_bin_qp(pub_key);
         DHs.compute_shared();
         std::tie(RK,CKs) = kdf_RK(SK,DHs.get_shared());
@@ -288,20 +279,25 @@ public:
     std::vector<uint8_t> encrypt(std::vector<uint8_t> data) override {
         auto [newkey, enckey] = kdf_CK(CKs);
         CKs = std::move(newkey);
+        ++Ns;
 
-        std::optional<std::array<uint8_t, 32>> key;
-        if(pubkey_to_send) {
-            key = DHs.get_bin_q();
-            PN = Ns;
-            Ns = 0;
-        }
-        else {
-            ++Ns;
-        }
+        std::array<uint8_t, 32> key = DHs.get_bin_q();
+        pubkey_to_send = false;
         Encoder e;
         e.put(create_header(key, PN, Ns));
         e.put(cry::encrypt_aes(data, {}, enckey));
         return e.move();
+    }
+
+
+    void compute_skipped(uint16_t N) {
+        while (N > Nr + 1) {
+            ++Nr; 
+            auto first = std::make_pair(pubkey,Nr);
+            auto [newkey, deckey] = kdf_CK(CKr);
+            SKIPPED.insert(std::make_pair(first,deckey));
+            CKr = std::move(newkey);
+        } 
     }
 
 
@@ -314,31 +310,31 @@ public:
      */
     std::vector<uint8_t> decrypt(std::vector<uint8_t> data) override {
         auto [key, PN, N] = parse_header(data);
-        if(N > Nr + 1) { // Skipped
-            if(key) {
-                SKIPPED = {};
-                while(Nr++ != PN) {
-                    std::tie(CKr, SKIPPED[Nr]) = kdf_CK(CKr);
-                }
-                Nr = 0;
-            }
-            else {
-                while(Nr++ != N + 1) {
-                    std::tie(CKr, SKIPPED[Nr]) = kdf_CK(CKr);
+        auto it = SKIPPED.find(std::make_pair(key,N));
+        
+        if (it == SKIPPED.end()) {  /*not skipped msg*/
+            if (key != pubkey) {    /*sent new pubkey for DH-DR*/
+                if (PN == Nr) {
+                    DHRatchet(key);
+                } else {
+                    compute_skipped(PN+1);   /*some msg wwere skipped */
+                    DHRatchet(key);
                 }
             }
-        }
-        else if(N < Nr + 1) { // Received skipped
-            return cry::decrypt_aes(data, {}, SKIPPED[N]);
-        }
-        if(key)
-            DHRatchet(*key);
 
-        auto [newkey, deckey] = kdf_CK(CKr);
-        CKr = std::move(newkey);
-        ++Nr;
-
-        return cry::decrypt_aes(data, {}, deckey);
+            if (N > Nr + 1) {               /*some msg were skipped*/
+                compute_skipped(N);
+            } else if (N < Nr + 1) {
+                /*TODO error - key should be found in SKIPPED*/
+            }
+            auto [newkey, deckey] = kdf_CK(CKr);
+            CKr = std::move(newkey);
+            ++Nr;
+            return cry::decrypt_aes(data, {}, deckey);
+        } else {
+            return cry::decrypt_aes(data, {}, it->second);
+        }
     }
 };
+
 #endif
