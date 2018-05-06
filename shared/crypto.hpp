@@ -532,7 +532,7 @@ void cry::ECKey::gen_pub_key() {
 
     mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers));
     mbedtls_ecdh_gen_public(&ctx.grp, &ctx.d, &ctx.Q, mbedtls_ctr_drbg_random, &ctr_drbg);      
-       
+
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_free(&ctr_drbg);
 }
@@ -547,21 +547,22 @@ std::array<uint8_t,32> cry::ECKey::get_bin_q() {
 
 void cry::ECKey::load_bin_qp(const std::array<uint8_t,32>& point) {
     mbedtls_mpi_lset(&ctx.Qp.Z,1);
-    mbedtls_mpi_read_binary(&ctx.Qp.X, point.data(), 32);       
+    mbedtls_mpi_read_binary(&ctx.Qp.X, point.data(), 32);
 }
 
 
 void cry::ECKey::compute_shared() {
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
-    const char *pers = "ecdh_compute_share"; 
+    std::array<uint8_t, 32> pers;
+    cry::defprng.random_data(pers);
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_init(&ctr_drbg);
 
-    mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers));
+    mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, pers.data(), pers.size());
 
     mbedtls_ecdh_compute_shared(&ctx.grp, &ctx.z, &ctx.Qp, &ctx.d, mbedtls_ctr_drbg_random, &ctr_drbg);
-        
+
     mbedtls_ctr_drbg_free(&ctr_drbg);
     mbedtls_entropy_free(&entropy);
 }
@@ -679,13 +680,14 @@ std::vector<uint8_t> cry::encrypt_rsa(const C& data, RSAKey& key) {
 
     result.resize(512);
 
-    const char *pers = "rsa_decrypt";
+    std::array<uint8_t, 32> pers;
+    cry::defprng.random_data(pers);
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_ctr_drbg_init(&ctr_drbg);
     mbedtls_entropy_init(&entropy);
 
-    mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers,strlen(pers));
+    mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, pers.data(), pers.size());
 
 
     mbedtls_rsa_pkcs1_encrypt(key.get(), mbedtls_ctr_drbg_random, &ctr_drbg, MBEDTLS_RSA_PUBLIC, data.size(), data.data(), result.data());
@@ -701,14 +703,15 @@ std::vector<uint8_t> cry::decrypt_rsa(const std::vector<uint8_t>& data, cry::RSA
         return result;
 
     result.resize(512);
-    const char *pers = "rsa_decrypt";
+    std::array<uint8_t, 32> pers;
+    cry::defprng.random_data(pers);
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_ctr_drbg_init(&ctr_drbg);
     mbedtls_entropy_init(&entropy);
 
     size_t i = 512;
-    mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers,strlen(pers));
+    mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, pers.data(), pers.size());
 
     mbedtls_rsa_pkcs1_decrypt(key.get(), mbedtls_ctr_drbg_random, &ctr_drbg, MBEDTLS_RSA_PRIVATE, &i, data.data(), result.data(), 512);
 
@@ -731,35 +734,15 @@ bool cry::check_hash(const std::vector<uint8_t>& data, const std::array <uint8_t
 }
 
 std::vector<uint8_t> cry::get_random_data(size_t len) {
-    mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_entropy_context entropy;
     std::vector<uint8_t> result;
     result.resize(len);
-
-    const char *pers = "some random string";
-
-    mbedtls_entropy_init(&entropy);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-    mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (unsigned char *) pers, strlen(pers));
-    mbedtls_ctr_drbg_random( &ctr_drbg, result.data(), len);
-    mbedtls_entropy_free(&entropy);
-    mbedtls_ctr_drbg_free(&ctr_drbg);
+    defprng.random_data(result);
     return result;
 }
 
 template<typename C>
 void cry::random_data(C& data) {
-    mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_entropy_context entropy;
-
-    const char *pers = "some random string";
-
-    mbedtls_entropy_init(&entropy);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-    mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (unsigned char *) pers, strlen(pers));
-    mbedtls_ctr_drbg_random( &ctr_drbg, data.data(), data.size());
-    mbedtls_entropy_free(&entropy);
-    mbedtls_ctr_drbg_free(&ctr_drbg);
+    defprng.random_data(data);
 }
 
 
@@ -770,14 +753,15 @@ void cry::generate_rsa_keys(RSAKey& rsa_pub, RSAKey& rsa_priv) {
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_mpi N, P, Q, D, E;
-    const char *pers = "rsa_genkey";
+    std::array<uint8_t, 32> pers;
+    cry::defprng.random_data(pers);
 
     mbedtls_ctr_drbg_init( &ctr_drbg );
     mbedtls_rsa_init( &rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
     mbedtls_mpi_init( &N ); mbedtls_mpi_init( &P ); mbedtls_mpi_init( &Q );
     mbedtls_mpi_init( &D ); mbedtls_mpi_init( &E );
     mbedtls_entropy_init( &entropy );
-    mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy,(const unsigned char *) pers, strlen(pers));
+    mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, pers.data(), pers.size());
 
     mbedtls_rsa_gen_key( &rsa, mbedtls_ctr_drbg_random, &ctr_drbg, key_size, exponent);
     mbedtls_rsa_export( &rsa, &N, &P, &Q, &D, &E );
