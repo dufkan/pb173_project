@@ -268,8 +268,6 @@ public:
         } 
     }
 
-   
-
 public:
     /**
      * Constructs DRBox of the client initiating the communication
@@ -297,6 +295,38 @@ public:
         CKr = {}; CKs = {}; 
     }
 
+    /**
+     * Deserialize DRBox into actual object
+     *
+     * @param data - Serialized DRBox
+     */
+    DRBox(std::vector<uint8_t> data) {
+        Decoder d{data};
+        RK = d.get_arr<32>();
+        CKs = d.get_arr<32>();
+        CKr = d.get_arr<32>();
+
+        // ugh
+        auto eckeylen = d.get_u32();
+        Encoder e;
+        e.put(eckeylen);
+        e.put(d.get_vec(eckeylen + 32));
+        auto eckeybytes = e.move();
+        DHs.load_key_binary(eckeybytes);
+
+        Ns = d.get_u16();
+        Nr = d.get_u16();
+        PN = d.get_u16();
+        pubkey_to_send = d.get_bool();
+        pubkey = d.get_arr<32>();
+        auto len = d.get_u16();
+        for(uint16_t i = 0; i < len; ++i) {
+            auto skipped_pubkey = d.get_arr<32>();
+            auto skipped_N = d.get_u16();
+            auto skipped_key = d.get_arr<32>();
+            SKIPPED[{skipped_pubkey, skipped_N}] = skipped_key;
+        }
+    }
 
     /**
      * Encrypting message
@@ -354,6 +384,26 @@ public:
             delete_skey(std::make_pair(key,N));
             return cry::decrypt_aes(data, {}, dec_key);
         }
+    }
+
+    std::vector<uint8_t> serialize() const {
+        Encoder e;
+        e.put(RK);
+        e.put(CKs);
+        e.put(CKr);
+        e.put(DHs.get_key_binary());
+        e.put(static_cast<uint16_t>(Ns));
+        e.put(static_cast<uint16_t>(Nr));
+        e.put(static_cast<uint16_t>(PN));
+        e.put(pubkey_to_send);
+        e.put(pubkey);
+        e.put(static_cast<uint16_t>(SKIPPED.size()));
+        for(const auto& i : SKIPPED) {
+            e.put(i.first.first); // message pubkey
+            e.put(i.first.second); // message N
+            e.put(i.second); // actual key
+        }
+        return e.move();
     }
 };
 

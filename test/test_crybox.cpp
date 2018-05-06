@@ -336,3 +336,30 @@ TEST_CASE("DRBox2","encrypt and decrypt"){
         REQUIRE(a.decrypt(skippb) == data);
     }
 }
+
+TEST_CASE("DRBox serialize/deserialize") {
+    std::array<uint8_t, 32> root;
+    cry::ECKey akey;
+    akey.gen_pub_key();
+    cry::ECKey bkey;
+    bkey.gen_pub_key();
+
+    DRBox a{root, bkey.get_bin_q()};
+    DRBox b{root, bkey};
+
+    REQUIRE(a.serialize() == a.serialize());
+    REQUIRE(b.serialize() == b.serialize());
+    REQUIRE(a.serialize() != b.serialize());
+
+    DRBox restored_a{a.serialize()};
+    REQUIRE(restored_a.RK == a.RK);
+    REQUIRE(restored_a.CKs == a.CKs);
+    REQUIRE(restored_a.CKr == a.CKr);
+    REQUIRE(restored_a.DHs == a.DHs);
+    REQUIRE(restored_a.Ns == a.Ns);
+    REQUIRE(restored_a.Nr == a.Nr);
+    REQUIRE(restored_a.PN == a.PN);
+    REQUIRE(restored_a.pubkey_to_send == a.pubkey_to_send);
+    REQUIRE(restored_a.pubkey == a.pubkey);
+    REQUIRE(restored_a.SKIPPED == a.SKIPPED);
+}

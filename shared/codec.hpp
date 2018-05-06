@@ -12,6 +12,10 @@ public:
     std::vector<uint8_t> data;
 
 public:
+    void put(bool val) {
+        data.push_back(static_cast<uint8_t>(val ? 1 : 0));
+    }
+
     void put(uint8_t val) {
         data.push_back(val);
     }
@@ -86,6 +90,11 @@ public:
     void cut() {
         data.erase(std::begin(data), std::begin(data) + i);
         i = 0;
+    }
+
+    bool get_bool() {
+        check_read(1);
+        return data[i++] == 1;
     }
 
     uint8_t get_u8() {

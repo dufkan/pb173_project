@@ -594,10 +594,6 @@ bool cry::ECKey::is_correct_priv(const ECKey& other) const {
     return has_priv() && ret;
 }
 
-
-
-
-
 std::vector<uint8_t> cry::ECKey::get_key_binary() const {
     Encoder enc;
     std::vector<uint8_t> buf;
@@ -613,11 +609,10 @@ std::vector<uint8_t> cry::ECKey::get_key_binary() const {
     return enc.get();
 }
 
-
-void cry::ECKey::load_key_binary (std::vector<uint8_t>& data) {
+void cry::ECKey::load_key_binary(std::vector<uint8_t>& data) {
     Decoder dec{data};
     size_t len = static_cast<uint32_t>(dec.get_u32());
-    
+
     std::vector<uint8_t> point = dec.get_vec(len);
     mbedtls_ecp_point_read_binary(&ctx.grp, &ctx.Q, point.data(), len);
     point.resize(32);
