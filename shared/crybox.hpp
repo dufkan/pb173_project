@@ -239,7 +239,36 @@ public:
         auto N = d.get_u16();
         d.cut();
         return {key, PN, N};
+}
+
+    /**
+     * Overwite and delete the key saved in SKIPPED
+     *
+     * @param ipair the pair under it is saved in SKIPPED
+     */
+    void delete_skey(std::pair<std::array<uint8_t,32>,uint16_t> ipair) {
+        std::array<uint8_t,32> overkey;
+        cry::random_data(overkey);
+        SKIPPED.find(ipair)-> second = overkey;
+        SKIPPED.erase(ipair);
+    }   
+
+    /**
+     * Compute skipped keys and save them in SKIPPED
+     *
+     * @param N - number in received message 
+     */    
+    void compute_skipped(uint16_t N) {
+        while (N > Nr + 1) {
+            ++Nr; 
+            auto first = std::make_pair(pubkey,Nr);
+            auto [newkey, deckey] = kdf_CK(CKr);
+            SKIPPED.insert(std::make_pair(first,deckey));
+            CKr = std::move(newkey);
+        } 
     }
+
+   
 
 public:
     /**
@@ -290,17 +319,6 @@ public:
     }
 
 
-    void compute_skipped(uint16_t N) {
-        while (N > Nr + 1) {
-            ++Nr; 
-            auto first = std::make_pair(pubkey,Nr);
-            auto [newkey, deckey] = kdf_CK(CKr);
-            SKIPPED.insert(std::make_pair(first,deckey));
-            CKr = std::move(newkey);
-        } 
-    }
-
-
     /**
      * Decrypting message
      * if a new public key is received, then DHratchet is called
@@ -332,7 +350,9 @@ public:
             ++Nr;
             return cry::decrypt_aes(data, {}, deckey);
         } else {
-            return cry::decrypt_aes(data, {}, it->second);
+            std::array<uint8_t, 32> dec_key = it->second;
+            delete_skey(std::make_pair(key,N));
+            return cry::decrypt_aes(data, {}, dec_key);
         }
     }
 };

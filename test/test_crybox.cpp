@@ -320,6 +320,7 @@ TEST_CASE("DRBox2","encrypt and decrypt"){
         REQUIRE((b.SKIPPED.find(std::make_pair(pubkey,2)) != b.SKIPPED.end()));
         REQUIRE(b.SKIPPED.find(std::make_pair(pubkey,2))->second == key);
         REQUIRE(b.decrypt(skipped1) == data);
+        REQUIRE((b.SKIPPED.find(std::make_pair(pubkey,2)) == b.SKIPPED.end()));
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
         
         std::vector<uint8_t> skippa = a.encrypt(data);
