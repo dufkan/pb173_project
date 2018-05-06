@@ -212,6 +212,109 @@ public :
 
 }; //ECKey
 
+/**
+ * PRNG - xoroshiro+128
+ *
+ * Fast PRNG seeded from /dev/random
+ */
+class PRNG {
+#ifdef TESTMODE
+public:
+#endif
+    uint64_t s[2];
+
+    /**
+     * Perform left bit rotation on 64 bit unsigned integer.
+     *
+     * @param x - rotated integer
+     * @param k - bits to rotate
+     */
+    inline uint64_t rotl(const uint64_t x, int k) {
+        return (x << k) | (x >> (64 - k));
+    }
+
+public:
+    /**
+     * Construct new instance of PRNG initiated with seed from /dev/random
+     */
+    PRNG() {
+        std::ifstream ifs{"/dev/random", std::ifstream::in | std::ifstream::binary};
+        ifs.read(reinterpret_cast<char*>(s), sizeof(uint64_t) * 2);
+    }
+
+
+    /**
+     * Get next uint64_t in the sequence
+     *
+     * @return - Next uint64_t in the sequence
+     */
+    uint64_t next() {
+        const uint64_t s0 = s[0];
+        uint64_t s1 = s[1];
+        const uint64_t result = s0 + s1;
+
+        s1 ^= s0;
+        s[0] = rotl(s0, 55) ^ s1 ^ (s1 << 14);
+        s[1] = rotl(s1, 36);
+
+        return result;
+    }
+
+
+    /**
+     * Skip to the state equivalent to 2^64 calls of next()
+     */
+    void jump() {
+        static const uint64_t JUMP[] = { 0xbeac0467eba5facb, 0xd86b048b86aa9922 };
+
+        uint64_t s0 = 0;
+        uint64_t s1 = 0;
+        for(size_t i = 0; i < sizeof(JUMP)/sizeof(*JUMP); i++)
+            for(int b = 0; b < 64; b++) {
+                if (JUMP[i] & UINT64_C(1) << b) {
+                    s0 ^= s[0];
+                    s1 ^= s[1];
+                }
+                next();
+            }
+
+        s[0] = s0;
+        s[1] = s1;
+    }
+
+    /**
+     * Fill container of uint8_t with random data.
+     *
+     * @param data - Container to fill
+     */
+    template<typename C>
+    void random_data(C& data) {
+        for(uint8_t& byte : data)
+            byte = next() & 0xff;
+    }
+
+    /**
+     * Fill block of bytes with random bytes.
+     *
+     * @param data - block of bytes
+     * @param bytes - number of bytes
+     */
+    void random_bytes(uint8_t* data, size_t bytes) {
+        while(bytes >= sizeof(uint64_t)) {
+            *reinterpret_cast<uint64_t*>(data) = next();
+            data += sizeof(uint64_t);
+            bytes -= sizeof(uint64_t);
+        }
+        while(bytes > 0) {
+            *data = next() & 0xff;
+            ++data;
+            --bytes;
+        }
+    }
+};
+
+PRNG defprng;
+
 
 /**
  * Pad given data vector using PKCS#7 padding method

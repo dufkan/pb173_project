@@ -271,3 +271,52 @@ TEST_CASE("ECKey - get and load binary") {
     CHECK(mbedtls_ecp_check_pubkey(&new_k.get()->grp,&new_k.get()->Q)==0);
     REQUIRE( k == new_k);    
 }
+
+TEST_CASE("PRNG") {
+    cry::PRNG a;
+    cry::PRNG b;
+
+    REQUIRE(cry::defprng.s[0] != a.s[0]);
+    REQUIRE(cry::defprng.s[1] != b.s[1]);
+    REQUIRE(a.s[0] != b.s[0]);
+    REQUIRE(a.s[1] != b.s[1]);
+
+    for(int i = 0; i < 1000; ++i) {
+        REQUIRE(a.next() != b.next());
+        REQUIRE(a.s[0] != b.s[0]);
+        REQUIRE(a.s[1] != b.s[1]);
+    }
+
+    for(int i = 0; i < 1000; ++i) {
+        std::array<uint8_t, 32> arr_a{};
+        std::array<uint8_t, 32> arr_b{};
+        std::array<uint8_t, 32> arr_def{};
+        a.random_data(arr_a);
+        b.random_data(arr_b);
+        cry::defprng.random_data(arr_def);
+        REQUIRE(arr_a != arr_b);
+        REQUIRE(arr_a != arr_def);
+    }
+
+    for(int i = 0; i < 1000; ++i) {
+        std::array<uint8_t, 32> arr_a{};
+        std::array<uint8_t, 32> arr_b{};
+        std::array<uint8_t, 32> arr_def{};
+        a.random_bytes(arr_a.data(), 32);
+        b.random_bytes(arr_b.data(), 32);
+        cry::defprng.random_bytes(arr_def.data(), 32);
+        REQUIRE(arr_a != arr_b);
+        REQUIRE(arr_a != arr_def);
+    }
+
+    for(int i = 0; i < 1000; ++i) {
+        std::array<uint8_t, 31> arr_a{};
+        std::array<uint8_t, 31> arr_b{};
+        std::array<uint8_t, 31> arr_def{};
+        a.random_bytes(arr_a.data(), 31);
+        b.random_bytes(arr_b.data(), 31);
+        cry::defprng.random_bytes(arr_def.data(), 31);
+        REQUIRE(arr_a != arr_b);
+        REQUIRE(arr_a != arr_def);
+    }
+}
