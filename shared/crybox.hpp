@@ -187,6 +187,18 @@ public:
         return {newkey, cry::hash_sha(newkey)};
     }
 
+    /**
+     * MAC key derivation function
+     *
+     * @param k - input data for kdf
+     * @return MAC key
+     */
+    static std::array<uint8_t, 32> kdf_MAC(std::array<uint8_t, 32> k) {
+        for(size_t i = 0; i < k.size(); ++i)
+            k[i] += i;
+        return cry::hash_sha(k);
+    }
+
 
     /**
      * Ratchet with generating new EC key pair and computing new shared secret key, RK
@@ -345,6 +357,8 @@ public:
         Encoder e;
         e.put(create_header(key, PN, Ns));
         e.put(cry::encrypt_aes(data, {}, enckey));
+        auto mackey = kdf_MAC(enckey);
+        e.put(cry::mac_data(e.get(), mackey));
         return e.move();
     }
 
@@ -357,9 +371,17 @@ public:
      * @return decrypted data (without new public key)
      */
     std::vector<uint8_t> decrypt(std::vector<uint8_t> data) override {
+        std::array<uint8_t, 32> mac;
+        std::copy(data.end() - 32, data.end(), mac.begin());
+        data.resize(data.size() - 32);
+
+        auto dcopy = data;
         auto [key, PN, N] = parse_header(data);
+
         auto it = SKIPPED.find(std::make_pair(key,N));
-        
+
+        std::array<uint8_t, 32> deckey;
+
         if (it == SKIPPED.end()) {  /*not skipped msg*/
             if (key != pubkey) {    /*sent new pubkey for DH-DR*/
                 if (PN == Nr) {
@@ -375,17 +397,24 @@ public:
             } else if (N < Nr + 1) {
                 /*TODO error - key should be found in SKIPPED*/
             }
-            auto [newkey, deckey] = kdf_CK(CKr);
-            CKr = std::move(newkey);
+            std::tie(CKr, deckey) = kdf_CK(CKr);
             ++Nr;
-            return cry::decrypt_aes(data, {}, deckey);
         } else {
-            std::array<uint8_t, 32> dec_key = it->second;
+            deckey = it->second;
             delete_skey(std::make_pair(key,N));
-            return cry::decrypt_aes(data, {}, dec_key);
         }
+
+        if(cry::mac_data(dcopy, kdf_MAC(deckey)) != mac)
+            throw std::runtime_error{"Invalid MAC."};
+
+        return cry::decrypt_aes(data, {}, deckey);
     }
 
+    /**
+     * Serialize DRBox
+     *
+     * @return Byte representation of this DRBox
+     */
     std::vector<uint8_t> serialize() const {
         Encoder e;
         e.put(RK);

@@ -254,13 +254,9 @@ TEST_CASE("DRBox2","encrypt and decrypt"){
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
         REQUIRE(b.decrypt(a.encrypt(data)) == data);
-        
+
         REQUIRE(a.RK != b.RK);
-        a.decrypt(a.encrypt(a.encrypt(data))); // break it
-
-        REQUIRE(a.decrypt(b.encrypt(data)) != data);
-        REQUIRE(b.decrypt(a.encrypt(data)) != data);
-
+        REQUIRE_THROWS(a.decrypt(a.encrypt(a.encrypt(data))));
     }
 
     SECTION("some") {
@@ -269,13 +265,9 @@ TEST_CASE("DRBox2","encrypt and decrypt"){
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
         REQUIRE(b.decrypt(a.encrypt(data)) == data);
-        
+
         REQUIRE(a.RK != b.RK);
-        a.decrypt(a.encrypt(a.encrypt(data))); // break it
-
-        REQUIRE(a.decrypt(b.encrypt(data)) != data);
-        REQUIRE(b.decrypt(a.encrypt(data)) != data);
-
+        REQUIRE_THROWS(a.decrypt(a.encrypt(a.encrypt(data))));
     }
 
     SECTION("a lot") {
@@ -288,18 +280,15 @@ TEST_CASE("DRBox2","encrypt and decrypt"){
         REQUIRE(b.decrypt(a.encrypt(data)) == data);
 
         REQUIRE(a.RK != b.RK);
-        a.decrypt(a.encrypt(a.encrypt(data))); // break it
-
-        REQUIRE(b.decrypt(a.encrypt(data)) != data);
-        REQUIRE(a.decrypt(b.encrypt(data)) != data);
+        REQUIRE_THROWS(a.decrypt(a.encrypt(a.encrypt(data))));
     }
 
     SECTION("Some skipped") {
         std::vector<uint8_t> data = {'T', 'e', 's', 't', ' ', 0x00, 0x01, 0x02, 0x03, 0x04};
         REQUIRE(b.decrypt(a.encrypt(data)) == data);
-        
+
         CHECK(a.CKs == b.CKr);
-        
+
         std::vector skipped1 = a.encrypt(data);
         std::array<uint8_t,32> key = cry::hash_sha(a.CKs);
         std::array<uint8_t,32> pubkey = a.DHs.get_bin_q();
@@ -316,13 +305,13 @@ TEST_CASE("DRBox2","encrypt and decrypt"){
         CHECK(b.PN == 2);
         REQUIRE(b.SKIPPED.size() == 1);
         REQUIRE(b.decrypt(a.encrypt(data)) == data);
-        
+
         REQUIRE((b.SKIPPED.find(std::make_pair(pubkey,2)) != b.SKIPPED.end()));
         REQUIRE(b.SKIPPED.find(std::make_pair(pubkey,2))->second == key);
         REQUIRE(b.decrypt(skipped1) == data);
         REQUIRE((b.SKIPPED.find(std::make_pair(pubkey,2)) == b.SKIPPED.end()));
         REQUIRE(a.decrypt(b.encrypt(data)) == data);
-        
+
         std::vector<uint8_t> skippa = a.encrypt(data);
         CHECK(a.CKs != b.CKr);
         std::vector<uint8_t> skippb = b.encrypt(data);
@@ -362,4 +351,23 @@ TEST_CASE("DRBox serialize/deserialize") {
     REQUIRE(restored_a.pubkey_to_send == a.pubkey_to_send);
     REQUIRE(restored_a.pubkey == a.pubkey);
     REQUIRE(restored_a.SKIPPED == a.SKIPPED);
+}
+
+TEST_CASE("DRBox MAC") {
+    std::array<uint8_t, 32> root;
+    cry::ECKey akey;
+    akey.gen_pub_key();
+    cry::ECKey bkey;
+    bkey.gen_pub_key();
+
+    DRBox a{root, bkey.get_bin_q()};
+    DRBox b{root, bkey};
+
+    std::vector<uint8_t> data = {'T', 'e', 's', 't', ' ', 0x00, 0x01, 0x02, 0x03, 0x04};
+    auto aencrypted = a.encrypt(data);
+    aencrypted[0] ^= 1 << 4;
+    REQUIRE_THROWS(b.decrypt(aencrypted));
+    auto bencrypted = b.encrypt(data);
+    bencrypted[0] ^= 1 << 4;
+    REQUIRE_THROWS(a.decrypt(bencrypted));
 }
