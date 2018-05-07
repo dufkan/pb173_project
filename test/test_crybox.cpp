@@ -270,6 +270,17 @@ TEST_CASE("DRBox2","encrypt and decrypt"){
         REQUIRE_THROWS(a.decrypt(a.encrypt(a.encrypt(data))));
     }
 
+
+    SECTION("recv start") {
+        std::vector<uint8_t> data = {'T', 'e', 's', 't', ' ', 0x00, 0x01, 0x02, 0x03, 0x04};
+        REQUIRE(a.decrypt(b.encrypt(data)) == data);
+        REQUIRE(a.decrypt(b.encrypt(data)) == data);
+        REQUIRE(b.decrypt(a.encrypt(data)) == data);
+        REQUIRE(b.decrypt(a.encrypt(data)) == data);
+        REQUIRE(a.decrypt(b.encrypt(data)) == data);
+        
+    }
+
     SECTION("a lot") {
         std::vector<uint8_t> data;
         data.resize(1024 * 1024);

@@ -71,7 +71,7 @@ public:
             asio::write(sock, asio::buffer(emsg));
             last = std::chrono::steady_clock::now();
         }
-        catch(std::exception e) {
+        catch(std::exception& e) {
             alive = false;
             throw ChannelException{"Socket is dead."};
         }

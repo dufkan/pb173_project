@@ -17,6 +17,7 @@
 #include "../shared/crypto.hpp"
 #include "../shared/codec.hpp"
 #include "../shared/util.hpp"
+#include "../shared/crybox.hpp"
 
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
@@ -26,6 +27,7 @@ class Client {
 public:
 #endif
     std::map<std::string, std::array<uint8_t,32>> contacts;
+    std::map<std::string, DRBox> friend_box;
     std::string pseudonym;
     std::optional<Channel> chan;
     cry::ECKey IKey;
@@ -388,16 +390,28 @@ msg::Send Client::create_message(std::string recv_name, std::array<uint8_t, 32> 
 
 std::vector<uint8_t> Client::send_msg_byte(std::string recv_name, std::string text) {
     std::vector<uint8_t> text_u(text.begin(), text.end());
+    auto it_recv_box = friend_box.find(recv_name);
+    std::vector<uint8_t> msg_send_ser;
+
+    if (it_recv_box != friend_box.end()) {
+        std::vector<uint8_t> text_enc = it_recv_box->second.encrypt(text_u);
+        msg::Send msg_send(recv_name,text_enc);
+        msg_send_ser = msg_send.serialize();
+    }
+
+#ifdef TESTMODE
+    else {    
     auto it_recv = contacts.find(recv_name);
-    
     if (it_recv == contacts.end()) {
         /* Send a message to server fot recv keys and prekeys.... */
 	    /*Is this checking for the second time needed?
         This should be error, it is chacked here for the second time */
     }
-    
     msg::Send msg_send = create_message(recv_name, it_recv->second, text_u);
-    return  msg_send.serialize();
+    msg_send_ser = msg_send.serialize();
+    }
+#endif
+    return  msg_send_ser;
 }
 
 
@@ -433,12 +447,24 @@ std::pair<std::string, std::string> Client::ui_get_param_msg() {
 
 std::pair<std::string, std::vector<uint8_t>> Client::decrypt_msg(msg::Recv& msg_recv) {
     std::string sender_name = msg_recv.get_sender();
+    auto it_sender_box = friend_box.find(sender_name);
+    std::vector<uint8_t> text_dec;
+ 
+    if (it_sender_box != friend_box.end()) {
+        text_dec = it_sender_box->second.decrypt(msg_recv.get_text());
+        //std::cout <<
+    }
+
+#ifdef TESTMODE
     auto it_sender = contacts.find(sender_name);
     if (it_sender == contacts.end()) {
         /* Some error or resolution of it */
 
     }
-    std::vector<uint8_t> text_dec = cry::decrypt_aes(msg_recv.get_text(),{},it_sender->second);
+    else if (it_sender_box == friend_box.end()) {
+    text_dec = cry::decrypt_aes(msg_recv.get_text(),{},it_sender->second);
+    }
+#endif    
     return std::make_pair(sender_name,text_dec);
 }
 
@@ -494,7 +520,7 @@ void Client::write_key(std::vector<uint8_t>& key){
 
 void Client::add_friend() {
          std::string name;
-         bool okaa = load_recv(name);
+         load_recv(name);
          std::array<uint8_t, 32> key = {{0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe, 0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81, 0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7, 0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4}};
         add_contact(name,key);     
 }
@@ -708,6 +734,7 @@ std::vector<uint8_t> Client::x3dh_msg_byte(msg::RetPrekey& msg_prekey, std::stri
     std::array<uint8_t, 32> K = compute_share_init(EK, SPK, IK, msg_prekey.get_OPK());
 
     contacts[msg_prekey.get_name()] = K; //TODO error if client is already saved in contacts
+    friend_box.insert(std::make_pair(msg_prekey.get_name(),DRBox{K,SPK}));
 
     auto text_enc = cry::encrypt_aes(text_u, {}, K);
 
@@ -724,6 +751,7 @@ std::pair<std::string, std::string> Client::handle_x3dh_msg(std::vector<uint8_t>
     auto K = compute_share_recv(IK, EK, x3dh_des.get_id());
     
     contacts[x3dh_des.get_name()]=K; //TODO error if client is already saved in contacts
+    friend_box.insert(std::make_pair(x3dh_des.get_name(),DRBox{K,SPKey}));
 
     auto text_dec = cry::decrypt_aes(x3dh_des.get_text(), {}, K);
     std::string text_s(text_dec.begin(), text_dec.end());
@@ -845,17 +873,42 @@ void Client::save_contacts(){
     if(!fs::is_directory(pseudonym))
         fs::create_directory(pseudonym);
     Encoder enc;
-    enc.put((uint16_t) contacts.size());
-    for (auto& c: contacts ) {
+    enc.put((uint16_t) friend_box.size());
+    for (auto& c : friend_box) {
         enc.put((uint8_t) c.first.size());
         enc.put(c.first);
-        enc.put(c.second);       
+        std::vector<uint8_t> dr_ser = c.second.serialize();
+        enc.put((uint16_t) dr_ser.size());
+        enc.put(dr_ser); 
     }
-    util::write_file(pseudonym+"/contacts",enc.get(),false);        
+    util::write_file(pseudonym+"/friend_box",enc.get(),false);
+#ifdef TESTMODE
+    Encoder enc2;
+    enc2.put((uint16_t) contacts.size());
+    for (auto& c: contacts ) {
+        enc2.put((uint8_t) c.first.size());
+        enc2.put(c.first);
+        enc2.put(c.second);       
+    }
+    util::write_file(pseudonym+"/contacts",enc2.get(),false);        
+#endif
 }    
 
 
 void Client::load_contacts(){
+    try {
+        Decoder dec{util::read_file(pseudonym+"/friend_box")};
+        uint16_t size = dec.get_u16();
+        for (uint16_t i = 0; i < size; i++) {
+            uint8_t len = dec.get_u8();
+            std::string s = dec.get_str((size_t) len);
+            uint16_t size = dec.get_u16();
+            friend_box.insert(std::make_pair(s,DRBox{dec.get_vec((size_t) size)}));
+        }
+    } catch (std::ios_base::failure& e) {
+    }
+
+#ifdef TESTMODE
     try {
         Decoder dec{util::read_file(pseudonym+"/contacts")};
         uint16_t size = dec.get_u16();
@@ -866,6 +919,9 @@ void Client::load_contacts(){
         }
     } catch (std::ios_base::failure& e) {        
     }
+#endif
+
+    
 }
 
 

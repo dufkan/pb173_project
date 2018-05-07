@@ -393,7 +393,7 @@ void Server::send_to(const std::string& pseudonym, const std::vector<uint8_t>& m
         try {
             conn->second.send(msg);
         }
-        catch(ChannelException e) {
+        catch(ChannelException& e) {
             message_queue[pseudonym].push(msg);
         }
     }

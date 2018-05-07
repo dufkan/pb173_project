@@ -34,7 +34,7 @@ TEST_CASE("Create and recieve message","without network") {
         CHECK(recv.second == text);
     }
 
-
+/*
     SECTION("O neco ladneji"){
         std::string text2 = "Ahoj, tohle je testovaci zprava, tak snad dorazi v poradku";
         auto msg_send = cl.send_msg_byte(name, text2);
@@ -42,7 +42,7 @@ TEST_CASE("Create and recieve message","without network") {
         CHECK(name == msg_recv.first);
         CHECK(text2 == msg_recv.second);
     }
-}
+*/}
 
 
 TEST_CASE("Generate prekey") {
@@ -173,4 +173,17 @@ TEST_CASE("save and load client params") {
     CHECK(manka.prekeys[id3] == rumc.prekeys[id3]);
 
     CHECK(manka.contacts == rumc.contacts);
+}
+
+TEST_CASE("Client friend_box") {
+    Client alice{"Alice"};
+    Client bob{"Bob"};
+
+    auto msg_prekey = msg::RetPrekey{bob.pseudonym, 0, {}, bob.IKey.get_bin_q(), bob.SPKey.get_bin_q()};
+
+    std::vector<uint8_t> msg = alice.x3dh_msg_byte(msg_prekey, "Ahoj");
+    auto [name,text] = bob.handle_x3dh_msg(msg);
+    CHECK(text == "Ahoj");
+    CHECK(bob.friend_box.size() == 1);
+    CHECK(alice.friend_box.size() == 1);
 }
