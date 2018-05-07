@@ -734,8 +734,8 @@ std::vector<uint8_t> Client::x3dh_msg_byte(msg::RetPrekey& msg_prekey, std::stri
     std::array<uint8_t, 32> K = compute_share_init(EK, SPK, IK, msg_prekey.get_OPK());
 
     contacts[msg_prekey.get_name()] = K; //TODO error if client is already saved in contacts
-    friend_box.insert(std::make_pair(msg_prekey.get_name(),DRBox{K,SPK}));
-
+    //friend_box.insert(std::make_pair(msg_prekey.get_name(),DRBox{K,SPK}));
+    friend_box.insert(std::make_pair(msg_prekey.get_name(),DRBox{K,EK}));
     auto text_enc = cry::encrypt_aes(text_u, {}, K);
 
     msg::X3dhInit msg{msg_prekey.get_name(), IKey.get_bin_q(), EK.get_bin_q(), msg_prekey.get_id(), text_enc};
@@ -751,8 +751,8 @@ std::pair<std::string, std::string> Client::handle_x3dh_msg(std::vector<uint8_t>
     auto K = compute_share_recv(IK, EK, x3dh_des.get_id());
     
     contacts[x3dh_des.get_name()]=K; //TODO error if client is already saved in contacts
-    friend_box.insert(std::make_pair(x3dh_des.get_name(),DRBox{K,SPKey}));
-
+    //friend_box.insert(std::make_pair(x3dh_des.get_name(),DRBox{K,SPKey}));
+    friend_box.insert(std::make_pair(x3dh_des.get_name(),DRBox{K,EK}));
     auto text_dec = cry::decrypt_aes(x3dh_des.get_text(), {}, K);
     std::string text_s(text_dec.begin(), text_dec.end());
     return std::make_pair(x3dh_des.get_name(), text_s);
