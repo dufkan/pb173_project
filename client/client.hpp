@@ -848,7 +848,7 @@ void Client::save_contacts(){
     enc.put((uint16_t) contacts.size());
     for (auto& c: contacts ) {
         enc.put((uint8_t) c.first.size());
-        enc.put(c.first.data());
+        enc.put(c.first);
         enc.put(c.second);       
     }
     util::write_file(pseudonym+"/contacts",enc.get(),false);        
