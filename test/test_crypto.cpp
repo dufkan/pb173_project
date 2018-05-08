@@ -320,3 +320,32 @@ TEST_CASE("PRNG") {
         REQUIRE(arr_a != arr_def);
     }
 }
+
+TEST_CASE("Elliptic Signatures") {
+    cry::ECKey k;
+    k.gen_pub_key();
+
+    SECTION("empty") {
+        std::vector<uint8_t> data = {};
+        auto sig = cry::sign_ec(data, k);
+        //REQUIRE(cry::verify_ec(data, sig, k.get_bin_q()));
+        sig[0] += 7;
+        //REQUIRE(!cry::verify_ec(data, sig, k.get_bin_q()));
+    }
+    SECTION("some") {
+        std::vector<uint8_t> data = {'T', 'e', 's', 't', ' ', 0x00, 0x01, 0x02, 0x03, 0x04};
+        auto sig = cry::sign_ec(data, k);
+        //REQUIRE(cry::verify_ec(data, sig, k.get_bin_q()));
+        sig[0] += 7;
+        //REQUIRE(!cry::verify_ec(data, sig, k.get_bin_q()));
+    }
+    SECTION("a lot") {
+        std::vector<uint8_t> data;
+        data.resize(1024 * 1024);
+        std::iota(data.begin(), data.end(), 0);
+        auto sig = cry::sign_ec(data, k);
+        //REQUIRE(cry::verify_ec(data, sig, k.get_bin_q()));
+        sig[0] += 7;
+        //REQUIRE(!cry::verify_ec(data, sig, k.get_bin_q()));
+    }
+}

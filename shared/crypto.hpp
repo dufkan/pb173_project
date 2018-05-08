@@ -21,6 +21,9 @@
 #include "codec.hpp"
 #include "util.hpp"
 
+using B32 = std::array<uint8_t, 32>;
+using BVec = std::vector<uint8_t>;
+
 
 namespace cry {
 
@@ -94,12 +97,9 @@ public:
 
 
 class ECKey {
-#ifdef TESTMODE
 public:
-#endif
     mbedtls_ecdh_context ctx;
 
-public : 
     ECKey() {
         mbedtls_ecdh_init(&ctx);
         mbedtls_ecp_group_load(&ctx.grp, MBEDTLS_ECP_DP_CURVE25519);
@@ -209,7 +209,6 @@ public :
      * @param fname Name of the file
      */ 
     void load_key_binary (std::vector<uint8_t>& data);
-
 }; //ECKey
 
 /**
@@ -474,6 +473,67 @@ std::array<uint8_t, 32> mac_data(const C& data, std::array<uint8_t, 32> key);
 template <typename C>
 bool check_mac(const C& data, std::array<uint8_t, 32> key, std::array<uint8_t, 32> mac_to_check); 
 
+/**
+ * Sign data using key
+ *
+ * @param data - Data to sign
+ * @param key - Signing key
+ * @return The signature!
+ */
+std::array<uint8_t, MBEDTLS_ECDSA_MAX_LEN> sign_ec(const BVec& data, const cry::ECKey& key) {
+    mbedtls_entropy_context entropy;
+    mbedtls_entropy_init(&entropy);
+    std::array<uint8_t, 32> pers;
+    cry::defprng.random_data(pers);
+
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+    mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, pers.data(), pers.size());
+
+
+    mbedtls_ecdsa_context ctx;
+    mbedtls_ecdsa_init(&ctx);
+
+    mbedtls_ecp_group_load(&ctx.grp, MBEDTLS_ECP_DP_CURVE25519);
+    mbedtls_ecp_copy(&ctx.Q, &key.ctx.Q);
+    mbedtls_mpi_copy(&ctx.d, &key.ctx.d);
+
+    B32 hash = cry::hash_sha(data);
+    std::array<uint8_t, MBEDTLS_ECDSA_MAX_LEN> sig{};
+    size_t sig_size = sig.size();
+
+    mbedtls_ecdsa_write_signature(&ctx, MBEDTLS_MD_SHA256, hash.data(), hash.size(), sig.data(), &sig_size, mbedtls_ctr_drbg_random, &ctr_drbg);
+
+
+    mbedtls_ecdsa_free( &ctx );
+    mbedtls_ctr_drbg_free( &ctr_drbg );
+    mbedtls_entropy_free( &entropy );
+    return sig;
+}
+
+/**
+ * Verify elliptic signature
+ *
+ * @param data - data
+ * @param sig - signature of the data
+ * @param key - public part of the signing key
+ * @return true if ok; false otherwise
+ */
+bool verify_ec(BVec data, const std::array<uint8_t, MBEDTLS_ECDSA_MAX_LEN>& sig, const B32& key) {
+    mbedtls_ecdsa_context ctx;
+    mbedtls_ecdsa_init(&ctx);
+
+    mbedtls_ecp_group_load(&ctx.grp, MBEDTLS_ECP_DP_CURVE25519);
+    mbedtls_ecp_point_read_binary(&ctx.grp, &ctx.Q, key.data(), key.size());
+
+    B32 hash = cry::hash_sha(data);
+
+    int ret = mbedtls_ecdsa_read_signature(&ctx, hash.data(), hash.size(), sig.data(), sig.size());
+
+    mbedtls_ecdsa_free(&ctx);
+    return ret == 0;
+}
+
 } // namespace cry
 
 
@@ -525,12 +585,13 @@ void cry::RSAKey::import(const std::vector<uint8_t>& key) {
 void cry::ECKey::gen_pub_key() {
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
-    const char *pers = "ec_gen_pu_lkey";
-   
+    std::array<uint8_t, 32> pers;
+    cry::defprng.random_data(pers);
+
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_init(&ctr_drbg);
 
-    mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers));
+    mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, pers.data(), pers.size());
     mbedtls_ecdh_gen_public(&ctx.grp, &ctx.d, &ctx.Q, mbedtls_ctr_drbg_random, &ctr_drbg);      
 
     mbedtls_entropy_init(&entropy);
@@ -803,5 +864,6 @@ bool cry::check_mac(const C& data, std::array<uint8_t, 32> key, std::array<uint8
     std::array<uint8_t, 32> act_mac = cry::mac_data(data, key);
     return act_mac == mac_to_check;
 }
+
 
 #endif
