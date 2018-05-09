@@ -21,7 +21,7 @@
 #include "codec.hpp"
 #include "util.hpp"
 
-using B16 = std::array<uint8_t, 32>;
+using B16 = std::array<uint8_t, 16>;
 using B32 = std::array<uint8_t, 32>;
 using BVec = std::vector<uint8_t>;
 
