@@ -17,6 +17,8 @@
 #include "mbedtls/rsa.h"
 #include "mbedtls/sha256.h"
 #include "mbedtls/x509.h"
+#include "mbedtls/md.h"
+#include "mbedtls/pkcs5.h"
 
 #include "codec.hpp"
 #include "util.hpp"
@@ -554,6 +556,18 @@ bool verify_ec(BVec data, const std::array<uint8_t, MBEDTLS_ECDSA_MAX_LEN>& sig,
     mbedtls_ecdsa_free(&ctx);
     return ret == 0;
 }
+
+template<typename N, typename M>
+B32 kdf(const N& pass, const M& salt) {
+    B32 result;
+    mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+    mbedtls_pkcs5_pbkdf2_hmac(&ctx, pass.data(), pass.size(), salt.data(), salt.size(), 65536, result.size(), result.data());
+    mbedtls_md_free(&ctx);
+    return result;
+}
+
 
 } // namespace cry
 

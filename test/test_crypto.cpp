@@ -348,3 +348,22 @@ TEST_CASE("Elliptic Signatures") {
         //REQUIRE(!cry::verify_ec(data, sig, k.get_bin_q()));
     }
 }
+
+TEST_CASE("KDF") {
+    B32 pass;
+    std::iota(pass.begin(), pass.end(), 0);
+    B16 salt;
+    std::iota(salt.begin(), salt.end(), 0x80);
+
+    B32 derived = cry::kdf(pass, salt);
+
+    for(int i = 0; i < 46; ++i)
+        REQUIRE(derived == cry::kdf(pass, salt));
+
+    pass[0] += 1;
+    REQUIRE(derived != cry::kdf(pass, salt));
+    pass[0] -= 1;
+    REQUIRE(derived == cry::kdf(pass, salt));
+    salt[0] += 1;
+    REQUIRE(derived != cry::kdf(pass, salt));
+}
