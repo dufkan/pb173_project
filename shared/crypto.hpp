@@ -21,6 +21,7 @@
 #include "codec.hpp"
 #include "util.hpp"
 
+using B16 = std::array<uint8_t, 32>;
 using B32 = std::array<uint8_t, 32>;
 using BVec = std::vector<uint8_t>;
 
@@ -220,16 +221,51 @@ class PRNG {
 #ifdef TESTMODE
 public:
 #endif
-    uint64_t s[2];
+    mbedtls_aes_context ctx; // aes context
+    B16 k; // aes key
+    B16 v; // seed
+    B16 dt{};  // datetime vector
+    B16 i;   // intermediate value
+    B16 r;   // result
 
     /**
-     * Perform left bit rotation on 64 bit unsigned integer.
+     * Perform XOR on blocks a and b of length len bytes and output result into o.
      *
-     * @param x - rotated integer
-     * @param k - bits to rotate
+     * @param a - block a
+     * @param b - block b
+     * @param o - output block
+     * @param len - length
      */
-    inline uint64_t rotl(const uint64_t x, int k) {
-        return (x << k) | (x >> (64 - k));
+    void memxor(const B16& a, const B16& b, B16& o) {
+        for(size_t i = 0; i < 16; ++i)
+            o[i] = a[i] ^ b[i];
+    }
+
+    /**
+     * Increment value of block b of length len bytes by 1.
+     */
+    void blockinc(B16& b) {
+        size_t len = 16;
+        do {
+           --len;
+           if(len == 0)
+               break;
+           b[len] += 1;
+        } while(b[len] < 1);
+    }
+
+    /**
+     * Encrypt 16 bytes using AES128 in ECB mode.
+     *
+     * @param data - input 16 bytes
+     * @return - encrypted 16 bytes
+     */
+    B16 aes_helper(const B16& data) {
+        B16 result;
+
+        mbedtls_aes_crypt_ecb(&ctx, MBEDTLS_AES_ENCRYPT, data.data(), result.data());
+
+        return result;
     }
 
 public:
@@ -237,49 +273,35 @@ public:
      * Construct new instance of PRNG initiated with seed from /dev/random
      */
     PRNG() {
-        std::ifstream ifs{"/dev/random", std::ifstream::in | std::ifstream::binary};
-        ifs.read(reinterpret_cast<char*>(s), sizeof(uint64_t) * 2);
+        std::ifstream ifs{"/dev/urandom", std::ifstream::in | std::ifstream::binary};
+        ifs.read(reinterpret_cast<char*>(k.data()), k.size());
+        ifs.read(reinterpret_cast<char*>(v.data()), v.size());
+        mbedtls_aes_init(&ctx);
+        mbedtls_aes_setkey_enc(&ctx, k.data(), 128);
     }
 
+    ~PRNG() {
+        mbedtls_aes_free(&ctx);
+    }
 
     /**
-     * Get next uint64_t in the sequence
+     * Get next 16 pseudorandom bytes
      *
-     * @return - Next uint64_t in the sequence
+     * @return - Next 16 pseudorandom bytes
      */
-    uint64_t next() {
-        const uint64_t s0 = s[0];
-        uint64_t s1 = s[1];
-        const uint64_t result = s0 + s1;
+    B16 next() {
+        B16 tmp;
 
-        s1 ^= s0;
-        s[0] = rotl(s0, 55) ^ s1 ^ (s1 << 14);
-        s[1] = rotl(s1, 36);
+        i = aes_helper(dt);
+        memxor(i, v, tmp);
+        r = aes_helper(tmp);
+        memxor(r, i, tmp);
+        v = aes_helper(tmp);
+        blockinc(dt);
 
-        return result;
+        return r;
     }
 
-
-    /**
-     * Skip to the state equivalent to 2^64 calls of next()
-     */
-    void jump() {
-        static const uint64_t JUMP[] = { 0xbeac0467eba5facb, 0xd86b048b86aa9922 };
-
-        uint64_t s0 = 0;
-        uint64_t s1 = 0;
-        for(size_t i = 0; i < sizeof(JUMP)/sizeof(*JUMP); i++)
-            for(int b = 0; b < 64; b++) {
-                if (JUMP[i] & UINT64_C(1) << b) {
-                    s0 ^= s[0];
-                    s1 ^= s[1];
-                }
-                next();
-            }
-
-        s[0] = s0;
-        s[1] = s1;
-    }
 
     /**
      * Fill container of uint8_t with random data.
@@ -289,7 +311,7 @@ public:
     template<typename C>
     void random_data(C& data) {
         for(uint8_t& byte : data)
-            byte = next() & 0xff;
+            byte = next()[0];
     }
 
     /**
@@ -299,13 +321,14 @@ public:
      * @param bytes - number of bytes
      */
     void random_bytes(uint8_t* data, size_t bytes) {
-        while(bytes >= sizeof(uint64_t)) {
-            *reinterpret_cast<uint64_t*>(data) = next();
-            data += sizeof(uint64_t);
-            bytes -= sizeof(uint64_t);
+        while(bytes >= 16) {
+            B16 rng = next();
+            std::copy(rng.begin(), rng.end(), data);
+            data += 16;
+            bytes -= 16;
         }
         while(bytes > 0) {
-            *data = next() & 0xff;
+            *data = next()[0];
             ++data;
             --bytes;
         }
@@ -346,8 +369,6 @@ void unpad(std::vector<uint8_t>& data, uint8_t bsize);
  */
 template <typename C>
 std::vector<uint8_t> encrypt_aes(const C& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key); 
-
-
 
 /**
  * Decrypt data vector with given key and IV by AES-256 in CBC mode

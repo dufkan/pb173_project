@@ -276,15 +276,14 @@ TEST_CASE("PRNG") {
     cry::PRNG a;
     cry::PRNG b;
 
-    REQUIRE(cry::defprng.s[0] != a.s[0]);
-    REQUIRE(cry::defprng.s[1] != b.s[1]);
-    REQUIRE(a.s[0] != b.s[0]);
-    REQUIRE(a.s[1] != b.s[1]);
+    REQUIRE(cry::defprng.k != a.k);
+    REQUIRE(cry::defprng.v != b.v);
+    REQUIRE(a.k != b.k);
+    REQUIRE(a.v != b.v);
 
     for(int i = 0; i < 1000; ++i) {
         REQUIRE(a.next() != b.next());
-        REQUIRE(a.s[0] != b.s[0]);
-        REQUIRE(a.s[1] != b.s[1]);
+        REQUIRE(a.v != b.v);
     }
 
     for(int i = 0; i < 1000; ++i) {
