@@ -109,13 +109,17 @@ TEST_CASE("Store/load prekey") {
         std::array<uint8_t, 32> SPK;
         std::iota(SPK.begin(), SPK.end(), i * 8);
         std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>> OPKs;
+        std::array<uint8_t, 512> sign;
+        std::iota(sign.begin(),sign.end(), i * 10);
+        std::vector<uint8_t> rsak(sign.begin(),sign.end());
+
         for(int j = 0; j < i; ++j) {
             uint16_t id = j * 1024;
             std::array<uint8_t, 32> OPK;
             std::iota(OPK.begin(), OPK.end(), j);
             OPKs.push_back({id, OPK});
         }
-        Server::store_prekeys("u" + std::to_string(i), IK, SPK, OPKs);
+        Server::store_prekeys("u" + std::to_string(i), IK, SPK, OPKs, sign, rsak);
     }
 
     for(int i = 0; i < 10; ++i) {
@@ -124,9 +128,15 @@ TEST_CASE("Store/load prekey") {
         std::array<uint8_t, 32> SPK;
         std::iota(SPK.begin(), SPK.end(), i * 8);
 
-        auto [stored_IK, stored_SPK, stored_OPKs] = Server::load_prekeys("u" + std::to_string(i));
+        std::array<uint8_t, 512> sign;
+        std::iota(sign.begin(),sign.end(), i * 10);
+        std::vector<uint8_t> rsak(sign.begin(),sign.end());
+        
+        auto [stored_IK, stored_SPK, stored_OPKs, stored_sign, stored_rsak] = Server::load_prekeys("u" + std::to_string(i));
         REQUIRE(IK == stored_IK);
         REQUIRE(SPK == stored_SPK);
+        REQUIRE(sign.size() == stored_sign.size());
+        REQUIRE(rsak == stored_rsak);
         REQUIRE(stored_OPKs.size() == i);
 
         for(int j = 0; j < i; ++j) {

@@ -54,6 +54,11 @@ public:
     virtual ~Message() {}
 };
 
+
+/**
+ * First message from Client in Challenge-Response between Client and Server
+ *
+ */
 class ClientInit : public Message {
 #ifdef TESTMODE
 public:
@@ -134,6 +139,12 @@ public:
     }
 };
 
+
+
+/**
+ * Server response in Challenge-Response between Client and Server
+ *
+ */
 class ServerResp : public Message {
 #ifdef TESTMODE
 public:
@@ -204,6 +215,12 @@ public:
     }
 };
 
+
+
+/**
+ * Client response in Challenge-Response between Client and Server
+ *
+ */
 class ClientResp : public Message {
 #ifdef TESTMODE
 public:
@@ -211,13 +228,16 @@ public:
     std::array<uint8_t, 32> Rs;
     std::optional<std::array<uint8_t, 32>> IK;
     std::optional<std::array<uint8_t, 32>> SPK;
+    std::optional<std::array<uint8_t, 512>> sign;
+    std::optional<std::vector<uint8_t>> rsak;
+
     std::vector<uint8_t> epayload;
 
 
     ClientResp(std::vector<uint8_t> epayload): epayload(std::move(epayload)) {}
 public:
     ClientResp(std::array<uint8_t, 32> Rs): Rs(std::move(Rs)) {}
-    ClientResp(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> IK, std::array<uint8_t, 32> SPK): Rs(std::move(Rs)), IK(std::move(IK)), SPK(std::move(SPK)) {
+    ClientResp(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> IK, std::array<uint8_t, 32> SPK, std::array<uint8_t,512> sign, std::vector<uint8_t> rsak): Rs(std::move(Rs)), IK(std::move(IK)), SPK(std::move(SPK)), sign(std::move(sign)), rsak(std::move(rsak)){
     }
 
     void encrypt(const std::array<uint8_t, 32>& K) {
@@ -227,6 +247,9 @@ public:
             e.put(static_cast<uint8_t>(1));
             e.put(*IK);
             e.put(*SPK);
+            e.put(*sign);
+            e.put(static_cast<uint16_t>(rsak->size()));
+            e.put(*rsak);
         }
         else{
             e.put(static_cast<uint8_t>(0));
@@ -240,6 +263,9 @@ public:
         if(d.get_u8() > 0) {
             IK = d.get_arr<32>();
             SPK = d.get_arr<32>();
+            sign = d.get_arr<512>();
+            uint16_t len = d.get_u16();
+            rsak = d.get_vec(len);
         }
     }
 
@@ -262,6 +288,10 @@ public:
         return {Rs, IK, SPK};
     }
 
+    std::tuple<std::optional<std::array<uint8_t, 512>>, std::optional<std::vector<uint8_t>>> get_sign_and_key() {
+        return {sign,rsak};
+    }
+
     friend bool operator==(const ClientResp& lhs, const ClientResp& rhs) {
         return lhs.Rs == rhs.Rs && lhs.IK == rhs.IK && lhs.SPK == rhs.SPK;
     }
@@ -271,6 +301,8 @@ public:
     }
 
 };
+
+
 
 /**
  * Send message - to another user
@@ -346,6 +378,8 @@ public:
     }
 };
 
+
+
 /**
  * Recieve message - from another user
  */
@@ -414,7 +448,8 @@ public:
     }
 };
 
-class Login : public Message {};
+
+
 
 /**
  * Message sent by server when requesting a new prekey.
@@ -440,6 +475,8 @@ public:
     }
 };
 
+
+
 /**
  * Message sent by server when returning asked for key to certain user.
  */
@@ -449,11 +486,13 @@ public:
 #endif
     std::string pseudonym;
     uint16_t id;    /*one time prekey id*/
-    std::array<uint8_t, 32> OPKey; /*one time prekey*/
-    std::array<uint8_t, 32> IKey; /*identity key*/
-    std::array<uint8_t, 32> SPKey; /*(not yet) signed prekey*/
+    std::array<uint8_t, 32>  OPKey; /*one time prekey*/
+    std::array<uint8_t, 32>  IKey; /*identity key*/
+    std::array<uint8_t, 32>  SPKey; /*(not yet) signed prekey*/
+    std::array<uint8_t, 512> sign; /*RSA signature of SPKey*/
+    std::vector<uint8_t>     signing_key;
 public:
-    RetPrekey(std::string pseudonym, uint16_t id, std::array<uint8_t, 32> OPKey, std::array<uint8_t, 32> IKey, std::array<uint8_t, 32> SPKey): pseudonym(std::move(pseudonym)), id(id), OPKey(std::move(OPKey)), IKey(std::move(IKey)), SPKey(std::move(SPKey)) {}
+    RetPrekey(std::string pseudonym, uint16_t id, std::array<uint8_t, 32> OPKey, std::array<uint8_t, 32> IKey, std::array<uint8_t, 32> SPKey, std::array<uint8_t,512> sign, std::vector<uint8_t> signing_key): pseudonym(std::move(pseudonym)), id(id), OPKey(std::move(OPKey)), IKey(std::move(IKey)), SPKey(std::move(SPKey)), sign(std::move(sign)), signing_key(std::move(signing_key)) {}
 
     std::vector<uint8_t> serialize() const {
         Encoder message;
@@ -464,6 +503,9 @@ public:
         message.put(OPKey);
         message.put(IKey);
         message.put(SPKey);
+        message.put(sign);
+        message.put(static_cast<uint16_t>(signing_key.size()));
+        message.put(signing_key);
         return message.move();
     }
 
@@ -476,11 +518,14 @@ public:
         auto OPKey = d.get_arr<32>();
         auto IKey = d.get_arr<32>();
         auto SPKey = d.get_arr<32>();
-        return std::make_unique<RetPrekey>(std::move(pseudonym), id, std::move(OPKey), std::move(IKey), std::move(SPKey));
+        auto sign = d.get_arr<512>();
+        uint16_t len = d.get_u16();
+        std::vector<uint8_t> signing_key = d.get_vec(len);
+        return std::make_unique<RetPrekey>(std::move(pseudonym), id, std::move(OPKey), std::move(IKey), std::move(SPKey), std::move(sign), std::move(signing_key));
     }
 
     friend bool operator==(const RetPrekey& lhs, const RetPrekey& rhs) {
-        return lhs.pseudonym == rhs.pseudonym && lhs.id == rhs.id && lhs.OPKey == rhs.OPKey && lhs.IKey == rhs.IKey && lhs.SPKey == rhs.SPKey ;
+        return lhs.pseudonym == rhs.pseudonym && lhs.id == rhs.id && lhs.OPKey == rhs.OPKey && lhs.IKey == rhs.IKey && lhs.SPKey == rhs.SPKey && lhs.sign == rhs.sign && lhs.signing_key == rhs.signing_key;
     }
 
     friend bool operator!=(const RetPrekey& lhs, const RetPrekey& rhs) {
@@ -506,7 +551,17 @@ public:
     std::array<uint8_t, 32> get_SPK() {
         return SPKey;
     }
+
+    std::array<uint8_t, 512> get_sign() {
+        return sign;
+    }
+
+    std::vector<uint8_t> get_signing_key() {
+        return signing_key;
+    }
 };
+
+
 
 /**
  * Message sent by client to request prekey of some other client (specified by pseudonym).

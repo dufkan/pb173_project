@@ -64,22 +64,59 @@ TEST_CASE("Message ClientResp") {
     cry::random_data(Rs);
     std::array<uint8_t, 32> K;
 
-    auto original = msg::ClientResp{Rs};
+    SECTION ("Small") {
+        auto original = msg::ClientResp{Rs};
 
-    CHECK(original.Rs == Rs);
+        CHECK(original.Rs == Rs);
+        original.encrypt(K);
 
-    original.encrypt(K);
+        std::vector<uint8_t> serialized = original.serialize();
+        CHECK(msg::type(serialized) == msg::MessageType::ClientResp);
 
-    std::vector<uint8_t> serialized = original.serialize();
-    CHECK(msg::type(serialized) == msg::MessageType::ClientResp);
+        std::unique_ptr<msg::Message> deserialized = msg::ClientResp::deserialize(serialized);
+        msg::ClientResp& restored = dynamic_cast<msg::ClientResp&>(*deserialized.get());
 
-    std::unique_ptr<msg::Message> deserialized = msg::ClientResp::deserialize(serialized);
-    msg::ClientResp& restored = dynamic_cast<msg::ClientResp&>(*deserialized.get());
+        restored.decrypt(K);
+        CHECK(restored.Rs == Rs);
+        CHECK(original == restored);
+    }
+    SECTION("With keys") {
+        std::array<uint8_t, 32> IK;
+        cry::random_data(IK);
+        std::array<uint8_t, 32> SPK;
+        cry::random_data(SPK);
+        cry::RSAKey rsak;
+        cry::generate_rsa_keys(rsak,rsak);
+        std::vector<uint8_t> rsak_exp = rsak.export_pub();    
+        std::array<uint8_t, 512> sign = cry::rsa_sign(rsak,SPK);
 
-    restored.decrypt(K);
-    CHECK(restored.Rs == Rs);
-
-    CHECK(original == restored);
+        auto original = msg::ClientResp{Rs,IK,SPK,sign,rsak_exp};
+        original.encrypt(K);
+        CHECK(original.Rs == Rs);
+        CHECK(original.IK == IK);
+        CHECK(original.SPK == SPK);
+        CHECK(original.sign == sign);
+        CHECK(original.rsak == rsak_exp);
+        
+        std::vector<uint8_t> serialized = original.serialize();
+        CHECK(msg::type(serialized) == msg::MessageType::ClientResp);
+        
+        std::unique_ptr<msg::Message> deserialized = msg::ClientResp::deserialize(serialized);
+        msg::ClientResp& restored = dynamic_cast<msg::ClientResp&>(*deserialized.get());
+        
+        restored.decrypt(K);
+        CHECK(restored.Rs == Rs);
+        CHECK(restored.IK == IK);
+        CHECK(restored.SPK == SPK);
+        CHECK(restored.sign == sign);
+        CHECK(restored.rsak == rsak_exp);
+        
+        cry::RSAKey rsak2;
+        auto [rsign, key] = restored.get_sign_and_key();
+        rsak2.import(*key);
+        REQUIRE(rsak2.has_pub());
+        CHECK(cry::rsa_verify(rsak2,SPK,*rsign));
+    }
 }
 
 
@@ -214,8 +251,15 @@ TEST_CASE("Message RetPrekye") {
 
     std::array<uint8_t, 32> SPK;
     cry::random_data(SPK);
+
+    cry::RSAKey rsak;
+    cry::generate_rsa_keys(rsak,rsak);
+    std::vector<uint8_t> rsak_exp = rsak.export_all();
+
+    std::array<uint8_t,512> sign;
+    cry::random_data(sign);
     
-    auto original = msg::RetPrekey{name,id,OPK,IK,SPK};
+    auto original = msg::RetPrekey{name,id,OPK,IK,SPK,sign,rsak_exp};
     
     CHECK(original.pseudonym == name);
     CHECK(name == original.get_name());
@@ -227,6 +271,10 @@ TEST_CASE("Message RetPrekye") {
     CHECK(SPK == original.get_SPK());
     CHECK(original.OPKey == OPK);
     CHECK(OPK == original.get_OPK());
+    CHECK(original.sign == sign);
+    CHECK(sign == original.get_sign());
+    CHECK(original.signing_key == rsak_exp);
+    CHECK(rsak_exp == original.get_signing_key());
 
     std::vector<uint8_t> serialized = original.serialize();
     CHECK(msg::type(serialized) == msg::MessageType::RetPrekey);

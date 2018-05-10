@@ -146,13 +146,13 @@ public:
      * Get point Q binary
      *
      */
-    std::array<uint8_t,32> get_bin_q();
+    B32 get_bin_q();
 
     /**
      * Load from binary data point Qp
      *
      */ 
-    void load_bin_qp(const std::array<uint8_t,32>& point);
+    void load_bin_qp(const B32& point);
 
     /**
      * Compute shared secret
@@ -170,7 +170,7 @@ public:
      * Return the shared secret in binary array
      *
      */
-    std::array<uint8_t,32> get_shared();
+    B32 get_shared();
 
     bool has_priv() const {
         return mbedtls_ecp_check_privkey(&ctx.grp,&ctx.d) == 0;
@@ -370,7 +370,7 @@ void unpad(std::vector<uint8_t>& data, uint8_t bsize);
  * @return Vector of encrypted data
  */
 template <typename C>
-std::vector<uint8_t> encrypt_aes(const C& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key); 
+std::vector<uint8_t> encrypt_aes(const C& data, std::array<uint8_t, 16> iv, const AESKey& key); 
 
 /**
  * Decrypt data vector with given key and IV by AES-256 in CBC mode
@@ -381,7 +381,7 @@ std::vector<uint8_t> encrypt_aes(const C& data, std::array<uint8_t, 16> iv, cons
  *
  * @return Vector of decrypted data
  */
-std::vector<uint8_t> decrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key);
+std::vector<uint8_t> decrypt_aes(const std::vector<uint8_t>& data, B16 iv, const AESKey& key);
 
  
 
@@ -418,7 +418,7 @@ std::vector<uint8_t> decrypt_rsa(const std::vector<uint8_t>& data, cry::RSAKey& 
  * @return Hashed input data
  */
 template<typename C>
-std::array<uint8_t, 32> hash_sha(const C& data); 
+B32 hash_sha(const C& data); 
 
 
 
@@ -428,7 +428,7 @@ std::array<uint8_t, 32> hash_sha(const C& data);
  * @param data - input data
  * @param control_hash
  */
-bool check_hash(const std::vector<uint8_t>& data, const std::array <uint8_t,32>& control_hash);
+bool check_hash(const std::vector<uint8_t>& data, const B32& control_hash);
 
 
 
@@ -470,7 +470,7 @@ void generate_rsa_keys(RSAKey& rsa_pub, RSAKey& rsa_priv);
  * @param second_part - data from response
  * @return symetric key created from chall and resp
  */
-std::array<uint8_t,32> create_symmetric_key(std::vector<uint8_t> first, std::vector<uint8_t> second); 
+AESKey create_symmetric_key(std::vector<uint8_t> first, std::vector<uint8_t> second); 
 
 
 
@@ -482,7 +482,7 @@ std::array<uint8_t,32> create_symmetric_key(std::vector<uint8_t> first, std::vec
  * @return MAC for data and key
  */
 template <typename C>
-std::array<uint8_t, 32> mac_data(const C& data, std::array<uint8_t, 32> key);
+B32 mac_data(const C& data, AESKey key);
 
 
 
@@ -494,7 +494,7 @@ std::array<uint8_t, 32> mac_data(const C& data, std::array<uint8_t, 32> key);
  * @return true if MAC is ok
  */
 template <typename C>
-bool check_mac(const C& data, std::array<uint8_t, 32> key, std::array<uint8_t, 32> mac_to_check); 
+bool check_mac(const C& data, AESKey key, B32 mac_to_check); 
 
 /**
  * Sign data using key
@@ -506,7 +506,7 @@ bool check_mac(const C& data, std::array<uint8_t, 32> key, std::array<uint8_t, 3
 std::array<uint8_t, MBEDTLS_ECDSA_MAX_LEN> sign_ec(const BVec& data, const cry::ECKey& key) {
     mbedtls_entropy_context entropy;
     mbedtls_entropy_init(&entropy);
-    std::array<uint8_t, 32> pers;
+    B32 pers;
     cry::defprng.random_data(pers);
 
     mbedtls_ctr_drbg_context ctr_drbg;
@@ -601,7 +601,7 @@ std::array<uint8_t, 512> cry::rsa_sign(RSAKey& key, B32& hash) {
     std::array<uint8_t, 512> buf;
     mbedtls_entropy_context entropy; 
     mbedtls_ctr_drbg_context ctr_drbg; 
-    std::array<uint8_t, 32> pers;
+    B32 pers;
     cry::defprng.random_data(pers);
 
     mbedtls_entropy_init( &entropy ); 
@@ -621,7 +621,7 @@ bool cry::rsa_verify(RSAKey& key, B32& hash, std::array<uint8_t, 512>& sign) {
     }
     mbedtls_entropy_context entropy; 
     mbedtls_ctr_drbg_context ctr_drbg; 
-    std::array<uint8_t, 32> pers;
+    B32 pers;
     cry::defprng.random_data(pers);
     int ret;
 
@@ -685,7 +685,7 @@ void cry::RSAKey::import(const std::vector<uint8_t>& key) {
 void cry::ECKey::gen_pub_key() {
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
-    std::array<uint8_t, 32> pers;
+    B32 pers;
     cry::defprng.random_data(pers);
 
     mbedtls_entropy_init(&entropy);
@@ -699,14 +699,14 @@ void cry::ECKey::gen_pub_key() {
 }
 
 
-std::array<uint8_t,32> cry::ECKey::get_bin_q() {
-    std::array<uint8_t,32> buf = {};
+B32 cry::ECKey::get_bin_q() {
+    B32 buf = {};
     mbedtls_mpi_write_binary(&ctx.Q.X, buf.data(), 32);
     return buf;
 }
 
 
-void cry::ECKey::load_bin_qp(const std::array<uint8_t,32>& point) {
+void cry::ECKey::load_bin_qp(const B32& point) {
     mbedtls_mpi_lset(&ctx.Qp.Z,1);
     mbedtls_mpi_read_binary(&ctx.Qp.X, point.data(), 32);
 }
@@ -715,7 +715,7 @@ void cry::ECKey::load_bin_qp(const std::array<uint8_t,32>& point) {
 void cry::ECKey::compute_shared() {
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
-    std::array<uint8_t, 32> pers;
+    B32 pers;
     cry::defprng.random_data(pers);
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_init(&ctr_drbg);
@@ -729,8 +729,8 @@ void cry::ECKey::compute_shared() {
 }
 
 
-std::array<uint8_t,32> cry::ECKey::get_shared() {
-    std::array<uint8_t,32> shared;
+cry::AESKey cry::ECKey::get_shared() {
+    AESKey shared;
     mbedtls_mpi_write_binary(&ctx.z,shared.data(),shared.size());
     return shared;
 }
@@ -798,7 +798,7 @@ void cry::unpad(std::vector<uint8_t>& data, uint8_t bsize) {
 }
 
 template <typename C>
-std::vector<uint8_t> cry::encrypt_aes(const C& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key) {
+std::vector<uint8_t> cry::encrypt_aes(const C& data, std::array<uint8_t, 16> iv, const AESKey& key) {
     std::vector<uint8_t> mut_data{std::begin(data), std::end(data)};
     pad(mut_data, 32);
     std::vector<uint8_t> result;
@@ -813,7 +813,7 @@ std::vector<uint8_t> cry::encrypt_aes(const C& data, std::array<uint8_t, 16> iv,
     return result;
 }
 
-std::vector<uint8_t> cry::decrypt_aes(const std::vector<uint8_t>& data, std::array<uint8_t, 16> iv, const std::array<uint8_t, 32>& key) {
+std::vector<uint8_t> cry::decrypt_aes(const std::vector<uint8_t>& data, B16 iv, const AESKey& key) {
     std::vector<uint8_t> result;
     result.resize(data.size());
 
@@ -836,7 +836,7 @@ std::vector<uint8_t> cry::encrypt_rsa(const C& data, RSAKey& key) {
 
     result.resize(512);
 
-    std::array<uint8_t, 32> pers;
+    B32 pers;
     cry::defprng.random_data(pers);
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
@@ -859,7 +859,7 @@ std::vector<uint8_t> cry::decrypt_rsa(const std::vector<uint8_t>& data, cry::RSA
         return result;
 
     result.resize(512);
-    std::array<uint8_t, 32> pers;
+    B32 pers;
     cry::defprng.random_data(pers);
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
@@ -877,14 +877,14 @@ std::vector<uint8_t> cry::decrypt_rsa(const std::vector<uint8_t>& data, cry::RSA
 }
 
 template<typename C>
-std::array<uint8_t, 32> cry::hash_sha(const C& data) {
-    std::array<uint8_t, 32> result;
+B32 cry::hash_sha(const C& data) {
+    B32 result;
     mbedtls_sha256_ret(data.data(), data.size(), result.data(), 0);
     return result;
 }
 
-bool cry::check_hash(const std::vector<uint8_t>& data, const std::array <uint8_t,32>& control_hash) {
-    std::array<uint8_t, 32> act_hash;
+bool cry::check_hash(const std::vector<uint8_t>& data, const B32& control_hash) {
+    B32 act_hash;
     mbedtls_sha256_ret(data.data(), data.size(), act_hash.data(), 0);
     return (act_hash==control_hash);
 }
@@ -909,7 +909,7 @@ void cry::generate_rsa_keys(RSAKey& rsa_pub, RSAKey& rsa_priv) {
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_mpi N, P, Q, D, E;
-    std::array<uint8_t, 32> pers;
+    B32 pers;
     cry::defprng.random_data(pers);
 
     mbedtls_ctr_drbg_init( &ctr_drbg );
@@ -936,16 +936,16 @@ void cry::generate_rsa_keys(RSAKey& rsa_pub, RSAKey& rsa_priv) {
 }
 
 
-std::array<uint8_t,32> cry::create_symmetric_key(std::vector<uint8_t> first, std::vector<uint8_t> second) {
+cry::AESKey cry::create_symmetric_key(std::vector<uint8_t> first, std::vector<uint8_t> second) {
     first.resize(first.size() + second.size());
     first.insert(first.end(),second.begin(),second.end());
     return cry::hash_sha(first);
 }
 
 template <typename C>
-std::array<uint8_t, 32> cry::mac_data(const C& data, std::array<uint8_t, 32> key) {
+B32 cry::mac_data(const C& data, AESKey key) {
     const mbedtls_cipher_info_t* cipher_info = mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_256_ECB);
-    std::array<uint8_t, 32> output{};
+    B32 output{};
     
     mbedtls_cipher_context_t ctx[1];
     mbedtls_cipher_init(ctx);
@@ -960,8 +960,8 @@ std::array<uint8_t, 32> cry::mac_data(const C& data, std::array<uint8_t, 32> key
 
 
 template <typename C>
-bool cry::check_mac(const C& data, std::array<uint8_t, 32> key, std::array<uint8_t, 32> mac_to_check) {
-    std::array<uint8_t, 32> act_mac = cry::mac_data(data, key);
+bool cry::check_mac(const C& data, AESKey key, B32 mac_to_check) {
+    B32 act_mac = cry::mac_data(data, key);
     return act_mac == mac_to_check;
 }
 

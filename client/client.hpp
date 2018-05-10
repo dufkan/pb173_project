@@ -22,22 +22,27 @@
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
 
+using B32 = std::array<uint8_t, 32>;
+
 class Client {
 #ifdef TESTMODE
 public:
 #endif
-    std::map<std::string, std::array<uint8_t,32>> contacts;
-    std::map<std::string, DRBox> friend_box;
-    std::string pseudonym;
+    std::map<std::string, cry::AESKey> contacts;     /*Saved contacts with keys, old verion, for tests only*/
+    std::map<std::string, DRBox> friend_box;    /*Saved sontacts with DrBoxes*/
+    std::string pseudonym;      /*Pseudonym*/
     std::optional<Channel> chan;
-    cry::ECKey IKey;
-    cry::ECKey SPKey;
+    cry::ECKey IKey;        /*Identity Key*/
+    cry::ECKey SPKey;       /*Signed Prekey*/
+    cry::RSAKey signing_key; /*Signing key*/
     std::mutex output_mutex;
     std::istream& in;
     std::ostream& out;
     std::ostream& err;
 
-    std::map<uint16_t, cry::ECKey> prekeys;
+    std::array<uint8_t, 512> SPK_sign;
+
+    std::map<uint16_t, cry::ECKey> prekeys;     /*One time Prekeys*/
 
 
     msg::MessageDeserializer message_deserializer;
@@ -82,7 +87,7 @@ public:
      *
      * @return message Send
      */
-    msg::Send create_message(std::string recv_name, std::array<uint8_t, 32> recv_key, std::vector<uint8_t> text);
+    msg::Send create_message(std::string recv_name, cry::AESKey recv_key, std::vector<uint8_t> text);
 
 
     /**
@@ -177,7 +182,7 @@ public:
      * 
      * @return shared key
      */
-    std::array<uint8_t,32> compute_share_init(cry::ECKey& EK, std::array<uint8_t,32>& oSPK, std::array<uint8_t,32>& oIK, std::array<uint8_t, 32> oOPK);
+    cry::AESKey compute_share_init(cry::ECKey& EK, B32& oSPK, B32& oIK, B32 oOPK);
 
     
     /**
@@ -187,7 +192,7 @@ public:
      * @param EK Public part of Ephermal key of the first client
      * @param idOPK Id of One time prekey used by the fisrt client
      */
-    std::array<uint8_t, 32> compute_share_recv(std::array<uint8_t, 32>& IK, std::array<uint8_t, 32>& EK, size_t idOPK); 
+    cry::AESKey compute_share_recv(B32& IK, B32& EK, size_t idOPK); 
 
     /**
      * Save keys in files and be able to use them for next run
@@ -231,7 +236,7 @@ public:
      * @param key Key
      * @return true is everything is OK, false is the contact is already saved
      */
-    bool add_contact(std::string name, std::array<uint8_t,32> key);
+    bool add_contact(std::string name, cry::AESKey key);
 
 
     /**
@@ -240,7 +245,7 @@ public:
      * @param name Pseudonym
      * @return key
      */
-    std::array<uint8_t,32> get_key(std::string name);
+    cry::AESKey get_key(std::string name);
 
 
 
@@ -348,7 +353,15 @@ public:
      *
      */ 
     void show_contacts() {
+        #ifdef TESTMODE
+        std::cout << "Contacts saved with keys: " << std::endl;
         for (auto& c : contacts) {
+            std::cout << c.first << std::endl;
+        }
+        std::cout<< "Contacts saved with DrBox: " <<std::endl;
+        #endif
+
+        for (auto& c : friend_box) {
             std::cout << c.first << std::endl;
         }
     }
@@ -380,7 +393,7 @@ std::vector<uint8_t> Client::get_logout_message(){
 }
 
 
-msg::Send Client::create_message(std::string recv_name, std::array<uint8_t, 32> recv_key, std::vector<uint8_t> text) {
+msg::Send Client::create_message(std::string recv_name, cry::AESKey recv_key, std::vector<uint8_t> text) {
     std::vector text_enc = cry::encrypt_aes(text, {}, recv_key);
     msg::Send msg_send(recv_name,text_enc);
     return msg_send;
@@ -491,7 +504,7 @@ void Client::ui_recv_message(std::vector<uint8_t> msg) {
 }
 
 
-bool Client::add_contact(std::string name, std::array<uint8_t,32> key) {
+bool Client::add_contact(std::string name, cry::AESKey key) {
     auto it = contacts.find(name);
     if (it != contacts.end())
         return false;
@@ -500,7 +513,7 @@ bool Client::add_contact(std::string name, std::array<uint8_t,32> key) {
 }
 
 
-std::array<uint8_t,32> Client::get_key(std::string name) {
+cry::AESKey Client::get_key(std::string name) {
     return contacts[name];
 }
 
@@ -521,7 +534,7 @@ void Client::write_key(std::vector<uint8_t>& key){
 void Client::add_friend() {
          std::string name;
          load_recv(name);
-         std::array<uint8_t, 32> key = {{0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe, 0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81, 0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7, 0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4}};
+         cry::AESKey key = {{0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe, 0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81, 0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7, 0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4}};
         add_contact(name,key);     
 }
 
@@ -601,7 +614,7 @@ void Client::initiate_connection(){
     cry::RSAKey spub;
     spub.import(file_key);
 
-    std::array<uint8_t, 32> Rc;
+    B32 Rc;
     cry::random_data(Rc);
 
     cry::RSAKey ckey;
@@ -639,9 +652,9 @@ void Client::initiate_connection(){
     Encoder e;
     e.put(Rs);
     e.put(Rc);
-    std::array<uint8_t, 32> K = cry::hash_sha(e.move());
+    cry::AESKey K = cry::hash_sha(e.move());
 
-    msg::ClientResp cresp{Rs, IKey.get_bin_q(), SPKey.get_bin_q()};
+    msg::ClientResp cresp{Rs, IKey.get_bin_q(), SPKey.get_bin_q(), SPK_sign, signing_key.export_pub()};
     cresp.encrypt(K);
     chan->send(cresp);
 
@@ -726,15 +739,31 @@ void Client::generate_prekey_lt(char which) {
 
 
 std::vector<uint8_t> Client::x3dh_msg_byte(msg::RetPrekey& msg_prekey, std::string text) {
+    auto SPK = msg_prekey.get_SPK();
+    auto IK = msg_prekey.get_IK();
+    auto sign = msg_prekey.get_sign();
+    auto rsak = msg_prekey.get_signing_key();
+
+    cry::RSAKey rsa_key;
+    rsa_key.import(rsak);
+    
+    if (!rsa_key.has_pub()) {
+        std::cerr << "Signing RSA key doesn't have public part." <<std::endl;
+        /*TODO some error*/
+        return {0,0};
+    }
+    
+    if (!cry::rsa_verify(rsa_key, SPK, sign)) {
+        std::cerr << "Signature of SPK is not OK." << std::endl;
+        /* TODO some error*/
+        return {0,0};
+    }
     std::vector<uint8_t> text_u(text.begin(), text.end());
     cry::ECKey EK;
     EK.gen_pub_key();
-    auto SPK = msg_prekey.get_SPK();
-    auto IK = msg_prekey.get_IK();
-    std::array<uint8_t, 32> K = compute_share_init(EK, SPK, IK, msg_prekey.get_OPK());
+    cry::AESKey K = compute_share_init(EK, SPK, IK, msg_prekey.get_OPK());
 
     contacts[msg_prekey.get_name()] = K; //TODO error if client is already saved in contacts
-    //friend_box.insert(std::make_pair(msg_prekey.get_name(),DRBox{K,SPK}));
     friend_box.insert(std::make_pair(msg_prekey.get_name(),DRBox{K,EK}));
     auto text_enc = cry::encrypt_aes(text_u, {}, K);
 
@@ -751,7 +780,6 @@ std::pair<std::string, std::string> Client::handle_x3dh_msg(std::vector<uint8_t>
     auto K = compute_share_recv(IK, EK, x3dh_des.get_id());
     
     contacts[x3dh_des.get_name()]=K; //TODO error if client is already saved in contacts
-    //friend_box.insert(std::make_pair(x3dh_des.get_name(),DRBox{K,SPKey}));
     friend_box.insert(std::make_pair(x3dh_des.get_name(),DRBox{K,EK}));
     auto text_dec = cry::decrypt_aes(x3dh_des.get_text(), {}, K);
     std::string text_s(text_dec.begin(), text_dec.end());
@@ -760,28 +788,28 @@ std::pair<std::string, std::string> Client::handle_x3dh_msg(std::vector<uint8_t>
 
 
 
-std::array<uint8_t,32> Client::compute_share_init(cry::ECKey& EK, std::array<uint8_t,32>& oSPK, std::array<uint8_t,32>& oIK, std::array<uint8_t, 32> oOPK) {
+cry::AESKey Client::compute_share_init(cry::ECKey& EK, B32& oSPK, B32& oIK, B32 oOPK) {
     IKey.load_bin_qp(oSPK);
     IKey.compute_shared();
-    std::array<uint8_t, 32> dh1 = IKey.get_shared(); 
+    cry::AESKey dh1 = IKey.get_shared(); 
 
     EK.load_bin_qp(oIK);
     EK.compute_shared();
-    std::array<uint8_t, 32> dh2 = EK.get_shared();
+    cry::AESKey dh2 = EK.get_shared();
 
     EK.load_bin_qp(oSPK);
     EK.compute_shared();
-    std::array<uint8_t, 32> dh3 = EK.get_shared();
+    cry::AESKey dh3 = EK.get_shared();
 
     std::vector<uint8_t> dh_con;
     dh_con.insert(dh_con.end(), dh1.begin(), dh1.end());
     dh_con.insert(dh_con.end(), dh2.begin(), dh2.end());
     dh_con.insert(dh_con.end(), dh3.begin(), dh3.end());
         
-    if (oOPK != std::array<uint8_t,32>{}) {
+    if (oOPK != B32{}) {
         EK.load_bin_qp(oOPK);
         EK.compute_shared();
-        std::array<uint8_t, 32> dh4 = EK.get_shared();
+        cry::AESKey dh4 = EK.get_shared();
 
         dh_con.insert(dh_con.end(), dh4.begin(), dh4.end());
     }
@@ -790,18 +818,18 @@ std::array<uint8_t,32> Client::compute_share_init(cry::ECKey& EK, std::array<uin
 }
 
 
-std::array<uint8_t, 32> Client::compute_share_recv(std::array<uint8_t, 32>& IK, std::array<uint8_t, 32>& EK, size_t idOPK) {
+cry::AESKey Client::compute_share_recv(B32& IK, B32& EK, size_t idOPK) {
     SPKey.load_bin_qp(IK);
     SPKey.compute_shared();
-    std::array<uint8_t, 32> dh1 = SPKey.get_shared();
+    cry::AESKey dh1 = SPKey.get_shared();
     
     IKey.load_bin_qp(EK);
     IKey.compute_shared();
-    std::array<uint8_t, 32> dh2 = IKey.get_shared();
+    cry::AESKey dh2 = IKey.get_shared();
 
     SPKey.load_bin_qp(EK);
     SPKey.compute_shared();
-    std::array<uint8_t, 32> dh3 = SPKey.get_shared();
+    cry::AESKey dh3 = SPKey.get_shared();
       
     std::vector<uint8_t> dh_con;
     dh_con.insert(dh_con.end(), dh1.begin(), dh1.end());
@@ -811,7 +839,7 @@ std::array<uint8_t, 32> Client::compute_share_recv(std::array<uint8_t, 32>& IK, 
     if (prekeys.find(idOPK) != prekeys.end()) {
         prekeys[idOPK].load_bin_qp(EK);
         prekeys[idOPK].compute_shared();
-        std::array<uint8_t, 32> dh4 = prekeys[idOPK].get_shared();
+        cry::AESKey dh4 = prekeys[idOPK].get_shared();
         prekeys.erase(idOPK);
         dh_con.insert(dh_con.end(), dh4.begin(), dh4.end());          
     }
@@ -824,7 +852,8 @@ void Client::save_keys() {
             fs::create_directory(pseudonym);
         util::write_file(pseudonym+"/IKey",IKey.get_key_binary(),false);
         util::write_file(pseudonym+"/SPKey", SPKey.get_key_binary(),false);
-        
+        util::write_file(pseudonym+"/signing_key", signing_key.export_all(),false);        
+
         Encoder enc;
         uint16_t num_opk = prekeys.size();
         enc.put(num_opk);
@@ -853,6 +882,15 @@ void Client::load_keys() {
     } catch (std::ios_base::failure& e) {    
         SPKey.gen_pub_key();
     }        
+
+    try {
+        std::vector<uint8_t> data = util::read_file(pseudonym+"/signing_key");
+        signing_key.import(data);
+    } catch (std::ios_base::failure& e) {
+        cry::generate_rsa_keys(signing_key,signing_key);
+        auto to_sign = SPKey.get_bin_q();
+        SPK_sign = cry::rsa_sign(signing_key,to_sign);
+    }
         
     try {
         Decoder dec{util::read_file(pseudonym+"/OPKeys")};

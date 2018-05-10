@@ -109,18 +109,29 @@ TEST_CASE("X3DH secret share client") {
 
 
 TEST_CASE("X3DH message, prekeys exchange, initial message and share secret key") {
-    Client alice;
-    Client bob;
+    Client alice{"aaaaaalice"};
+    Client bob{"booooob"};
+   
+    alice.load_keys();
+    bob.load_keys();
     
+    CHECK(bob.signing_key.has_pub());
+    CHECK(alice.signing_key.has_pub());
+    CHECK(bob.signing_key.has_priv());
+    CHECK(alice.signing_key.has_priv());
+
+    auto bin_q = bob.SPKey.get_bin_q();
+    CHECK(cry::rsa_verify(bob.signing_key, bin_q, bob.SPK_sign));
+     
     uint16_t id = bob.generate_prekey();
     cry::ECKey& OPK = bob.prekeys[id];
     CHECK(bob.prekeys.find(id) != bob.prekeys.end());
-    msg::RetPrekey msg_pre{"bob", id, OPK.get_bin_q(), bob.IKey.get_bin_q(), bob.SPKey.get_bin_q()};
+    msg::RetPrekey msg_pre{"bob", id, OPK.get_bin_q(), bob.IKey.get_bin_q(), bob.SPKey.get_bin_q(), bob.SPK_sign, bob.signing_key.export_pub()};
 
     std::string text = "Ahoj ja jsem alice.";
     
     std::vector<uint8_t> msg_ser = alice.x3dh_msg_byte(msg_pre,text); 
-
+    CHECK(msg_ser.size() != 2);
     std::unique_ptr<msg::Message> deserialized = msg::X3dhInit::deserialize(msg_ser);
     msg::X3dhInit& restored = dynamic_cast<msg::X3dhInit&>(*deserialized.get());
     
@@ -167,7 +178,6 @@ TEST_CASE("save and load client params") {
     CHECK(bin_spk == rumc.SPKey.get_key_binary());
     CHECK(bin_qp == rumc.IKey.get_bin_q());
     CHECK(rumc.prekeys.size() == manka.prekeys.size());
-    //CHECK(rumc.prekeys.size() == 3);
     CHECK(manka.prekeys[id1] == rumc.prekeys[id1]);
     CHECK(manka.prekeys[id2] == rumc.prekeys[id2]);
     CHECK(manka.prekeys[id3] == rumc.prekeys[id3]);
@@ -176,12 +186,19 @@ TEST_CASE("save and load client params") {
 }
 
 TEST_CASE("Client friend_box") {
-    Client alice{"Alice"};
-    Client bob{"Bob"};
+    Client alice{"iAlice"};
+    Client bob{"iBob"};
+    
+    CHECK(bob.friend_box.size() == 0);
+    CHECK(alice.friend_box.size() == 0);
+    alice.load_keys(); bob.load_keys();
 
-    auto msg_prekey = msg::RetPrekey{bob.pseudonym, 0, {}, bob.IKey.get_bin_q(), bob.SPKey.get_bin_q()};
+    auto bin_q = bob.SPKey.get_bin_q();
+    CHECK(cry::rsa_verify(bob.signing_key, bin_q, bob.SPK_sign));
+    auto msg_prekey = msg::RetPrekey{bob.pseudonym, 0, {}, bob.IKey.get_bin_q(), bob.SPKey.get_bin_q(),bob.SPK_sign,bob.signing_key.export_pub()};
 
     std::vector<uint8_t> msg = alice.x3dh_msg_byte(msg_prekey, "Ahoj");
+    CHECK(msg.size() != 2);
     auto [name,text] = bob.handle_x3dh_msg(msg);
     CHECK(text == "Ahoj");
     CHECK(bob.friend_box.size() == 1);

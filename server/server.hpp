@@ -19,6 +19,7 @@
 
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
+using key32 = std::array<uint8_t, 32>;
 
 #include "asio.hpp"
 #include "../shared/messages.hpp"
@@ -34,7 +35,7 @@ public:
     volatile bool shutdown = false;
 #endif
     std::map<std::string, Channel> connections;
-    std::map<std::string, std::tuple<std::array<uint8_t, 32>, std::array<uint8_t, 32>, std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>>>> prekeys; // IK, SPK, OPK
+    std::map<std::string, std::tuple<key32, key32, std::vector<std::pair<uint16_t, key32>>, std::array<uint8_t,512>, std::vector<uint8_t>>> prekeys; // IK, SPK, OPK, signature, RSAsig
     std::mutex connection_queue_mutex;
     std::deque<std::pair<std::string, Channel>> connection_queue;
     std::map<std::string, std::queue<std::vector<uint8_t>>> message_queue;
@@ -106,7 +107,7 @@ public:
      * @param SPK - Signed Prekey
      * @param OPKs - Vector of one-time prekeys with assigned ids
      */
-    static void store_prekeys(const std::string pseudonym, std::array<uint8_t, 32> IK, std::array<uint8_t, 32> SPK, std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>> OPKs);
+    static void store_prekeys(const std::string pseudonym, key32 IK, key32 SPK, std::vector<std::pair<uint16_t, key32>> OPKs, std::array<uint8_t, 512> sign, std::vector<uint8_t> signing_key);
 
     /**
      * Load prekeys of certain client from local file
@@ -114,7 +115,7 @@ public:
      * @param pseudonym - Name of the Client
      * @returns The ALL-IN-ONE bundle!
      */
-    static std::tuple<std::array<uint8_t, 32>, std::array<uint8_t, 32>, std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>>> load_prekeys(const std::string pseudonym);
+    static std::tuple<key32, key32, std::vector<std::pair<uint16_t, key32>>, std::array<uint8_t,512>, std::vector<uint8_t>> load_prekeys(const std::string pseudonym);
 public:
     Server();
 
@@ -310,7 +311,7 @@ void Server::connection_handler() {
             msg::ClientResp& cresp = dynamic_cast<msg::ClientResp&>(*uniq_cresp.get());
             cresp.decrypt(K);
             auto [verify_Rs, IK, SPK] = cresp.get();
-
+            auto [sign, signing_key] = cresp.get_sign_and_key();
             if(verify_Rs != Rs) {
                 std::cerr << "We got a BIG problem! 'Rs != Rs'" << std::endl;
                 continue; // TODO exception
@@ -318,9 +319,9 @@ void Server::connection_handler() {
 
             chan.set_crybox(std::unique_ptr<CryBox>{new SeqBox{new AESBox{K}, new MACBox{K}}});
 
-            if(IK && SPK) {
-                prekeys[pseudonym] = {*IK, *SPK, {}};
-                store_prekeys(pseudonym, *IK, *SPK, {});
+            if(IK && SPK && sign && signing_key) {
+                prekeys[pseudonym] = {*IK, *SPK, {}, *sign, *signing_key};
+                store_prekeys(pseudonym, *IK, *SPK, {}, *sign, *signing_key);
             }
 
             if(local_key.empty() && !client_key.empty())
@@ -463,15 +464,15 @@ void Server::handle_ask_prekey(const std::string& pseudonym, msg::AskPrekey msg)
     if(pks == prekeys.end());
     // TODO respond with error if fails
     else {
-        auto& [IK, SPK, OPKs] = pks->second;
+        auto& [IK, SPK, OPKs, sign, rsak] = pks->second;
         uint16_t id = 0;
         std::array<uint8_t, 32> OPK{};
         if(!OPKs.empty()) {
             std::tie(id, OPK) = OPKs.back();
             OPKs.pop_back();
-            store_prekeys(pks->first, std::get<0>(pks->second), std::get<1>(pks->second), std::get<2>(pks->second));
+            store_prekeys(pks->first, std::get<0>(pks->second), std::get<1>(pks->second), std::get<2>(pks->second), std::get<3>(pks->second), std::get<4>(pks->second));
         }
-        send_to(pseudonym, msg::RetPrekey{msg.get_pseudonym(), id, OPK, IK, SPK}.serialize());
+        send_to(pseudonym, msg::RetPrekey{msg.get_pseudonym(), id, OPK, IK, SPK, sign, rsak}.serialize());
     }
 }
 
@@ -479,10 +480,13 @@ void Server::handle_upload_prekey(const std::string& pseudonym, msg::UploadPreke
     std::get<2>(prekeys[pseudonym]).push_back(msg.get());
 }
 
-void Server::store_prekeys(const std::string pseudonym, std::array<uint8_t, 32> IK, std::array<uint8_t, 32> SPK, std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>> OPKs) {
+void Server::store_prekeys(const std::string pseudonym, key32 IK, key32 SPK, std::vector<std::pair<uint16_t, key32>> OPKs, std::array<uint8_t, 512> sign, std::vector<uint8_t> signing_key) {
     Encoder e;
     e.put(IK);
     e.put(SPK);
+    e.put(sign);
+    e.put(static_cast<uint16_t>(signing_key.size()));
+    e.put(signing_key);
     e.put(static_cast<uint16_t>(OPKs.size()));
     for(auto& [id, OPK] : OPKs) {
         e.put(id);
@@ -491,18 +495,21 @@ void Server::store_prekeys(const std::string pseudonym, std::array<uint8_t, 32> 
     util::write_file("prekeys/" + pseudonym, e.move());
 }
 
-std::tuple<std::array<uint8_t, 32>, std::array<uint8_t, 32>, std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>>> Server::load_prekeys(const std::string pseudonym) {
+std::tuple<key32, key32, std::vector<std::pair<uint16_t, key32>>, std::array<uint8_t,512>, std::vector<uint8_t>> Server::load_prekeys(const std::string pseudonym) {
     Decoder d{util::read_file("prekeys/" + pseudonym)};
     auto IK = d.get_arr<32>();
     auto SPK = d.get_arr<32>();
+    auto sign = d.get_arr<512>();
+    auto len = d.get_u16();
+    auto signing_key = d.get_vec(len);
     auto OPKslen = d.get_u16();
-    std::vector<std::pair<uint16_t, std::array<uint8_t, 32>>> OPKs;
+    std::vector<std::pair<uint16_t, key32>> OPKs;
     for(uint16_t i = 0; i < OPKslen; ++i) {
         auto id = d.get_u16();
         auto OPK = d.get_arr<32>();
         OPKs.push_back({id, OPK});
     }
-    return {IK, SPK, std::move(OPKs)};
+    return {IK, SPK, std::move(OPKs), sign, signing_key};
 }
 
 void Server::prepare_prekeys() {
