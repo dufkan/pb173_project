@@ -569,8 +569,73 @@ B32 kdf(const N& pass, const M& salt) {
 }
 
 
+/**
+ * Sign hash with RSAKey
+ *
+ * @param key - RSAKey with private part
+ * @oaram hash - 32byte hash array of data
+ * @return Sign
+ */
+std::array<uint8_t, 512> rsa_sign(RSAKey& key, B32& hash); 
+    
+
+/**
+ * Verify Sign of hash
+ *
+ * @param key - RSAKey with public part
+ * @param hash - hash of data
+ * @param sign - sign of hash to be chacked
+ * @return true if the signature of hash is right
+ */
+bool rsa_verify(RSAKey& key, B32& hash, std::array<uint8_t, 512>& sign); 
+
+
 } // namespace cry
 
+
+
+std::array<uint8_t, 512> cry::rsa_sign(RSAKey& key, B32& hash) {
+    if (!key.has_priv()) {
+        //TODO error
+    }
+    std::array<uint8_t, 512> buf;
+    mbedtls_entropy_context entropy; 
+    mbedtls_ctr_drbg_context ctr_drbg; 
+    std::array<uint8_t, 32> pers;
+    cry::defprng.random_data(pers);
+
+    mbedtls_entropy_init( &entropy ); 
+    mbedtls_ctr_drbg_init( &ctr_drbg ); 
+    
+    mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, pers.data(), pers.size());
+    mbedtls_rsa_rsassa_pss_sign(key.get(), mbedtls_ctr_drbg_random, &ctr_drbg, MBEDTLS_RSA_PRIVATE, MBEDTLS_MD_SHA256, 32, hash.data(), buf.data());
+    mbedtls_ctr_drbg_free( &ctr_drbg );
+    mbedtls_entropy_free( &entropy );
+    return buf;
+}
+    
+
+bool cry::rsa_verify(RSAKey& key, B32& hash, std::array<uint8_t, 512>& sign) {
+    if (!key.has_pub()) {
+        //TODO some error
+    }
+    mbedtls_entropy_context entropy; 
+    mbedtls_ctr_drbg_context ctr_drbg; 
+    std::array<uint8_t, 32> pers;
+    cry::defprng.random_data(pers);
+    int ret;
+
+    mbedtls_entropy_init( &entropy ); 
+    mbedtls_ctr_drbg_init( &ctr_drbg ); 
+    
+    mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, pers.data(), pers.size());
+    
+    ret = mbedtls_rsa_rsassa_pss_verify(key.get(), mbedtls_ctr_drbg_random, &ctr_drbg,  MBEDTLS_RSA_PUBLIC, MBEDTLS_MD_SHA256, 32, hash.data(), sign.data());
+    
+    mbedtls_entropy_free( &entropy );
+    mbedtls_ctr_drbg_free( &ctr_drbg );
+    return (ret == 0);
+}
 
 
 

@@ -201,7 +201,45 @@ TEST_CASE("RSA import and export") {
 }
 
 
+TEST_CASE("RSA signing") {
+   
+    SECTION("Empty"){
+        cry::RSAKey key;
+        cry::generate_rsa_keys(key,key);
+        CHECK(key.has_pub());
+        CHECK(key.has_priv());
+        std::array<uint8_t, 32> hash = {};
+    
+        std::array<uint8_t, 512> sign = cry::rsa_sign(key,hash);
+    
+        CHECK(cry::rsa_verify(key,hash,sign));
 
+        cry::generate_rsa_keys(key,key);
+        CHECK(!cry::rsa_verify(key,hash,sign));
+    }
+    SECTION("Empty two keys") {
+        cry::RSAKey pub, priv;
+        cry::generate_rsa_keys(pub,priv);
+        std::array<uint8_t, 32> hash= {};
+        CHECK(pub.has_pub());
+        CHECK(priv.has_priv());
+            
+        std::array<uint8_t, 512> sign = cry::rsa_sign(priv,hash);
+        CHECK(cry::rsa_verify(pub,hash,sign));
+    }
+    SECTION("Not empty two keys") {
+        cry::RSAKey pub, priv;
+        cry::generate_rsa_keys(pub,priv);
+        std::array<uint8_t, 32> hash;
+        cry::random_data(hash);
+        CHECK(pub.has_pub());
+        CHECK(priv.has_priv());
+            
+        std::array<uint8_t, 512> sign = cry::rsa_sign(priv,hash);
+        CHECK(cry::rsa_verify(pub,hash,sign));
+
+    }
+}
 
 
 TEST_CASE("ECDH generating public and private keys") {
