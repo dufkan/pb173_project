@@ -77,7 +77,7 @@ public:
 
 public:
     TDecoder() = default;
-    TDecoder(C data): data(data) {}
+    explicit TDecoder(C data): data(data) {}
 
     void append(const std::vector<uint8_t>& new_data) {
         data.insert(std::end(data), std::begin(new_data), std::end(new_data));

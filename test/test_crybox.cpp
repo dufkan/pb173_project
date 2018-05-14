@@ -105,7 +105,7 @@ TEST_CASE("MACBox"){
 TEST_CASE("SeqBox single") {
     std::array<uint8_t, 32> K;
     std::for_each(K.begin(), K.end(), [](uint8_t x){ return x * x + 1; });
-    SeqBox box = std::unique_ptr<CryBox>{new AESBox{K}};
+    SeqBox box = SeqBox(std::unique_ptr<CryBox>{new AESBox{K}});
     AESBox abox{K};
 
     SECTION("empty") {
@@ -133,7 +133,7 @@ TEST_CASE("SeqBox single") {
 TEST_CASE("SeqBox multiple") {
     std::array<uint8_t, 32> K;
     std::for_each(K.begin(), K.end(), [](uint8_t x){ return x * x + 1; });
-    SeqBox box = {new IdBox, new MACBox{K}, new AESBox{K}};
+    SeqBox box{new IdBox, new MACBox{K}, new AESBox{K}};
     AESBox abox{K};
     MACBox mbox{K};
 

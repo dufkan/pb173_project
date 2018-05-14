@@ -107,7 +107,7 @@ public:
      * @param SPK - Signed Prekey
      * @param OPKs - Vector of one-time prekeys with assigned ids
      */
-    static void store_prekeys(const std::string pseudonym, key32 IK, key32 SPK, std::vector<std::pair<uint16_t, key32>> OPKs, std::array<uint8_t, 512> sign, std::vector<uint8_t> signing_key);
+    static void store_prekeys(const std::string& pseudonym, key32 IK, key32 SPK, std::vector<std::pair<uint16_t, key32>> OPKs, std::array<uint8_t, 512> sign, std::vector<uint8_t> signing_key);
 
     /**
      * Load prekeys of certain client from local file
@@ -115,7 +115,7 @@ public:
      * @param pseudonym - Name of the Client
      * @returns The ALL-IN-ONE bundle!
      */
-    static std::tuple<key32, key32, std::vector<std::pair<uint16_t, key32>>, std::array<uint8_t,512>, std::vector<uint8_t>> load_prekeys(const std::string pseudonym);
+    static std::tuple<key32, key32, std::vector<std::pair<uint16_t, key32>>, std::array<uint8_t,512>, std::vector<uint8_t>> load_prekeys(const std::string& pseudonym);
 public:
     Server();
 
@@ -156,7 +156,7 @@ public:
      * @param pseudonym - Originator of the message
      * @param msg - The message
      */
-    void handle_send(const std::string& pseudonym, msg::Send msg);
+    void handle_send(const std::string& pseudonym, const msg::Send& msg);
 
     /**
      * GetOnline Message handler
@@ -172,7 +172,7 @@ public:
      * @param pseudonym - Originator of the message
      * @param msg - The message
      */
-    void handle_ask_prekey(const std::string& pseudonym, msg::AskPrekey msg);
+    void handle_ask_prekey(const std::string& pseudonym, const msg::AskPrekey& msg);
 
     /**
      * UploadPrekey Message handler
@@ -180,7 +180,7 @@ public:
      * @param pseudonym - Originator of the message
      * @param msg - The message
      */
-    void handle_upload_prekey(const std::string& pseudonym, msg::UploadPrekey msg);
+    void handle_upload_prekey(const std::string& pseudonym, const msg::UploadPrekey& msg);
 
     /**
      * Message error handler
@@ -408,7 +408,7 @@ std::set<std::string> Server::get_connected_users() {
     return connected;
 }
 
-void Server::handle_send(const std::string& pseudonym, msg::Send msg) {
+void Server::handle_send(const std::string& pseudonym, const msg::Send& msg) {
     msg::Recv recv{pseudonym, msg.get_text()}; 
     send_to(msg.get_receiver(), recv.serialize());
 }
@@ -459,10 +459,9 @@ void Server::handle_x3dh_init(const std::string& pseudonym, msg::X3dhInit msg) {
     send_to(recv, msg.serialize());
 }
 
-void Server::handle_ask_prekey(const std::string& pseudonym, msg::AskPrekey msg) {
+void Server::handle_ask_prekey(const std::string& pseudonym, const msg::AskPrekey& msg) {
     auto pks = prekeys.find(msg.get_pseudonym());
     if(pks == prekeys.end());
-    // TODO respond with error if fails
     else {
         auto& [IK, SPK, OPKs, sign, rsak] = pks->second;
         uint16_t id = 0;
@@ -476,11 +475,11 @@ void Server::handle_ask_prekey(const std::string& pseudonym, msg::AskPrekey msg)
     }
 }
 
-void Server::handle_upload_prekey(const std::string& pseudonym, msg::UploadPrekey msg) {
+void Server::handle_upload_prekey(const std::string& pseudonym, const msg::UploadPrekey& msg) {
     std::get<2>(prekeys[pseudonym]).push_back(msg.get());
 }
 
-void Server::store_prekeys(const std::string pseudonym, key32 IK, key32 SPK, std::vector<std::pair<uint16_t, key32>> OPKs, std::array<uint8_t, 512> sign, std::vector<uint8_t> signing_key) {
+void Server::store_prekeys(const std::string& pseudonym, key32 IK, key32 SPK, std::vector<std::pair<uint16_t, key32>> OPKs, std::array<uint8_t, 512> sign, std::vector<uint8_t> signing_key) {
     Encoder e;
     e.put(IK);
     e.put(SPK);
@@ -495,7 +494,7 @@ void Server::store_prekeys(const std::string pseudonym, key32 IK, key32 SPK, std
     util::write_file("prekeys/" + pseudonym, e.move());
 }
 
-std::tuple<key32, key32, std::vector<std::pair<uint16_t, key32>>, std::array<uint8_t,512>, std::vector<uint8_t>> Server::load_prekeys(const std::string pseudonym) {
+std::tuple<key32, key32, std::vector<std::pair<uint16_t, key32>>, std::array<uint8_t,512>, std::vector<uint8_t>> Server::load_prekeys(const std::string& pseudonym) {
     Decoder d{util::read_file("prekeys/" + pseudonym)};
     auto IK = d.get_arr<32>();
     auto SPK = d.get_arr<32>();

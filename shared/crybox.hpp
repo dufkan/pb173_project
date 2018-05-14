@@ -63,7 +63,7 @@ public:
     cry::AESKey key;
 
 public:
-    AESBox(cry::AESKey key): key(key) {}
+    explicit AESBox(cry::AESKey key): key(key) {}
 
     std::vector<uint8_t> encrypt(std::vector<uint8_t> data) override {
         return cry::encrypt_aes(data, {}, key);
@@ -86,7 +86,7 @@ public:
 #endif
     cry::AESKey key;
 public:
-    MACBox(cry::AESKey key): key(cry::hash_sha(key)) {}
+    explicit MACBox(cry::AESKey key): key(cry::hash_sha(key)) {}
 
     std::vector<uint8_t> encrypt(std::vector<uint8_t> data) override {
         std::array<uint8_t, 32> mac = cry::mac_data(data, key);
@@ -115,15 +115,15 @@ public:
 #endif
     std::vector<std::unique_ptr<CryBox>> boxes;
 public:
-    SeqBox(CryBox* box) {
+    explicit SeqBox(CryBox* box) {
         boxes.emplace_back(box);
     }
 
-    SeqBox(std::unique_ptr<CryBox> box) {
+    explicit SeqBox(std::unique_ptr<CryBox> box) {
         boxes.push_back(std::move(box));
     }
 
-    SeqBox(std::initializer_list<CryBox*> bxs) {
+    explicit SeqBox(std::initializer_list<CryBox*> bxs) {
         for(auto box : bxs)
             boxes.emplace_back(box);
     }
@@ -305,16 +305,14 @@ public:
      * @param SK - Shared secret key
      * @param DHs - ECKey, other side has its public key
      */
-    DRBox(key32 SK, cry::ECKey DHs): RK(SK), DHs(DHs) { 
-        CKr = {}; CKs = {}; 
-    }
+    DRBox(key32 SK, cry::ECKey DHs): RK(SK), CKs({}), CKr({}), DHs(DHs) {}
 
     /**
      * Deserialize DRBox into actual object
      *
      * @param data - Serialized DRBox
      */
-    DRBox(std::vector<uint8_t> data) {
+    explicit DRBox(const std::vector<uint8_t>& data) {
         Decoder d{data};
         RK = d.get_arr<32>();
         CKs = d.get_arr<32>();

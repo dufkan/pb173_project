@@ -149,7 +149,7 @@ public:
      * From received bytes write to user name of the sender and text of the message
      *
      */
-    void ui_recv_message(std::vector<uint8_t> msg);
+    void ui_recv_message(const std::vector<uint8_t>& msg);
 
     /**
      * Thread for receiving messages
@@ -169,7 +169,7 @@ public:
      *
      * @param which 's' - SPKey, 'i' - IKey, 'b' - both
      */
-    void generate_prekey_lt(char which); 
+    void generate_prekey_lt(char which);
 
 
     /**
@@ -497,7 +497,7 @@ std::pair<std::string,std::string> Client::handle_recv_msg(std::vector<uint8_t> 
 }
 
 
-void Client::ui_recv_message(std::vector<uint8_t> msg) {
+void Client::ui_recv_message(const std::vector<uint8_t>& msg) {
     auto msg_param = handle_recv_msg(msg);
     out << "Message from: "<< msg_param.first << std::endl;
     out << "Text: " << msg_param.second << std::endl;
