@@ -397,7 +397,7 @@ public:
             if (N > Nr + 1) {               /*some msg were skipped*/
                 compute_skipped(N);
             } else if (N < Nr + 1) {
-                /*TODO error - key should be found in SKIPPED*/
+                throw std::domain_error{"Key not found in SKIPPED"};
             }
             std::tie(CKr, deckey) = kdf_CK(CKr);
             ++Nr;

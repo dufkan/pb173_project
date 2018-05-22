@@ -122,7 +122,7 @@ public:
         mbedtls_ecp_group_load(&ctx.grp, MBEDTLS_ECP_DP_CURVE25519);
         mbedtls_ecp_copy(&ctx.Q, &other.ctx.Q);
         mbedtls_mpi_copy(&ctx.d, &other.ctx.d);
-        return *this; //TODO nepotrebuju nahodou kopirovat i d?
+        return *this; 
     }
 
 
@@ -596,7 +596,7 @@ bool rsa_verify(RSAKey& key, B32& hash, std::array<uint8_t, 512>& sign);
 
 std::array<uint8_t, 512> cry::rsa_sign(RSAKey& key, B32& hash) {
     if (!key.has_priv()) {
-        //TODO error
+        throw std::invalid_argument{"RSAKey has not private part"};
     }
     std::array<uint8_t, 512> buf;
     mbedtls_entropy_context entropy; 
@@ -617,7 +617,7 @@ std::array<uint8_t, 512> cry::rsa_sign(RSAKey& key, B32& hash) {
 
 bool cry::rsa_verify(RSAKey& key, B32& hash, std::array<uint8_t, 512>& sign) {
     if (!key.has_pub()) {
-        //TODO some error
+        throw std::invalid_argument{"RSAKey has not public part"};
     }
     mbedtls_entropy_context entropy; 
     mbedtls_ctr_drbg_context ctr_drbg; 

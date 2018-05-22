@@ -280,17 +280,10 @@ public:
     void initiate_connection();
 
 
-    void print_menu() {
-        out << "a - add contact with defaul key K" << std::endl;
-        out << "c - show saved contacts" << std::endl;
-        out << "d - send me a dafualt message" << std::endl;
-        out << "o - get online users" << std::endl;
-        out << "q - disconnect" << std::endl;
-        out << "s - send to another user a message" << std::endl;
-        //out << "w - wait for a message" << std::endl;
-        out << "x - add contact (ask for prekeys, compute share with X3DH" << std::endl;
-        out << "z - send a message to (a user) me" << std::endl;
-    }
+    /**
+     * Printf a menu to a user
+     */ 
+    void print_menu();
 
 
     /**
@@ -365,8 +358,22 @@ public:
             std::cout << c.first << std::endl;
         }
     }
+
     
 }; //Client
+
+void Client::print_menu() {
+    //out << "a - add contact with defaul key K" << std::endl;
+    out << "c - show saved contacts" << std::endl;
+    //out << "d - send me a dafualt message" << std::endl;
+    out << "o - get online users" << std::endl;
+    out << "q - disconnect" << std::endl;
+    out << "r - receive" <<std::endl;
+    out << "s - send a message to another user" << std::endl;
+    //out << "w - wait for a message" << std::endl;
+    out << "x - add contact - create a shared key" << std::endl;
+    //out << "z - send a message to (a user) me" << std::endl;
+}
 
 
 std::vector<uint8_t> Client::get_online_message(){
@@ -416,9 +423,7 @@ std::vector<uint8_t> Client::send_msg_byte(std::string recv_name, std::string te
     else {    
     auto it_recv = contacts.find(recv_name);
     if (it_recv == contacts.end()) {
-        /* Send a message to server fot recv keys and prekeys.... */
-	    /*Is this checking for the second time needed?
-        This should be error, it is chacked here for the second time */
+        std::cerr << "Receiver not saved in contacts. Please add to contacts first." << std::endl;
     }
     msg::Send msg_send = create_message(recv_name, it_recv->second, text_u);
     msg_send_ser = msg_send.serialize();
@@ -433,8 +438,8 @@ bool Client::load_recv(std::string& recv_name) {
     std::getline(in,recv_name);
     if(recv_name.size() < 2)
 	    std::getline(in,recv_name);
-	auto it = contacts.find(recv_name);
-	return (it!=contacts.end());    
+	auto it = friend_box.find(recv_name);
+	return (it!=friend_box.end());    
 }
 
 
@@ -450,9 +455,9 @@ std::string Client::load_text_message() {
 std::pair<std::string, std::string> Client::ui_get_param_msg() {
 	std::string recv_name;
 	if(!load_recv(recv_name)) {
-	    /* Load pseudonym of receiver which is not saved in conntacts
-           Does the user want to load the key and save it? */
-	}
+        //std::cerr << "Receiver not saved in contacts. Please add to contacts first." << std::endl;
+	    throw std::invalid_argument{"Bad name"};
+    }
 	return std::make_pair(recv_name, load_text_message());
 }
 
@@ -465,14 +470,12 @@ std::pair<std::string, std::vector<uint8_t>> Client::decrypt_msg(msg::Recv& msg_
  
     if (it_sender_box != friend_box.end()) {
         text_dec = it_sender_box->second.decrypt(msg_recv.get_text());
-        //std::cout <<
     }
 
 #ifdef TESTMODE
     auto it_sender = contacts.find(sender_name);
     if (it_sender == contacts.end()) {
-        /* Some error or resolution of it */
-
+        std::cerr<< "Sender not saved in contacts. Message wasn't decrypt right." << std::endl;
     }
     else if (it_sender_box == friend_box.end()) {
     text_dec = cry::decrypt_aes(msg_recv.get_text(),{},it_sender->second);
@@ -486,11 +489,11 @@ std::pair<std::string,std::string> Client::handle_recv_msg(std::vector<uint8_t> 
     std::unique_ptr<msg::Message> msg_des = msg::Recv::deserialize(msg_u);
     msg::Recv& recv_des = dynamic_cast<msg::Recv&>(*msg_des.get());
     
-    auto it = contacts.find(recv_des.get_sender());
-    if (it == contacts.end()) {
+//    auto it = friend_box.find(recv_des.get_sender());
+//    if (it == friend_box.end()) {
         /* Some error or resolution of it */
-
-    } 
+//        std::cerr << "Receive message from user without shared key." << std::endl;
+//    } 
     auto sender_text = decrypt_msg(recv_des);
     std::string text_s(reinterpret_cast<char*> (sender_text.second.data()),sender_text.second.size());
     return std::make_pair(sender_text.first,text_s);
@@ -564,25 +567,30 @@ void Client::run() {
         in >> what;
         std::string p, t;
         switch(what) {
-            case 'a':
+/*            case 'a':
                 add_friend();
                 break;
-
+*/
             case 'c':
                 show_contacts();
                 break;
             
-            case 'd':
+/*            case 'd':
                 chan->send(send_msg_byte(pseudonym, "Ahoj, testuju zpravy"));
                 break;
-
+*/
             case 'o':
                 chan->send(get_online_message());
                 break;
             
             case 's':
-                std::tie(p, t) = ui_get_param_msg();
-                chan->send(send_msg_byte(p, t));
+                try {
+                    std::tie(p, t) = ui_get_param_msg();
+                    chan->send(send_msg_byte(p, t));
+                }
+                catch(std::ios_base::failure& e) {
+                    std::cerr << "Trying to send a message to someone you don't know.\nSave him in contacts first." << std::endl;
+                }
                 break;
 
             case 'x': {
@@ -590,11 +598,11 @@ void Client::run() {
                 load_recv(recv);
                 chan->send(ask_prekey_byte(recv));                
                 break;}
-            case 'z':
+/*            case 'z':
                 std::tie(p, t) = ui_get_param_msg();
                 chan->send(send_msg_byte(pseudonym, t));
                 break;
-
+*/
         }
         if (what == 'q') {
             chan->send(get_logout_message());
@@ -638,15 +646,14 @@ void Client::initiate_connection(){
     auto sresp = dynamic_cast<msg::ServerResp&>(*uniq_sresp.get());
     sresp.decrypt(ckey);
     if (!sresp.check_mac()){
-        /*trouble with integrity*/
-        err << "Problem with integrity, MAC of sresp" << std::endl;
-        return; //TODO handle with excetion
+        throw std::runtime_error{"Invalid MAC."};
+        return; 
     } 
     auto [Rs, verify_Rc] = sresp.get();
 
     if(verify_Rc != Rc) {
-        err << "There is a BIG problem! 'Rc != Rc'" << std::endl;
-        return; // TODO handle with exception
+        throw std::runtime_error{"Bad server response."};
+        return; 
     }
 
     Encoder e;
@@ -748,14 +755,12 @@ std::vector<uint8_t> Client::x3dh_msg_byte(msg::RetPrekey& msg_prekey, std::stri
     rsa_key.import(rsak);
     
     if (!rsa_key.has_pub()) {
-        std::cerr << "Signing RSA key doesn't have public part." <<std::endl;
-        /*TODO some error*/
+        throw std::invalid_argument{"RSA key without private part."};
         return {0,0};
     }
     
     if (!cry::rsa_verify(rsa_key, SPK, sign)) {
-        std::cerr << "Signature of SPK is not OK." << std::endl;
-        /* TODO some error*/
+        std::runtime_error{"Bad signature."};    
         return {0,0};
     }
     std::vector<uint8_t> text_u(text.begin(), text.end());
@@ -958,9 +963,8 @@ void Client::load_contacts(){
     } catch (std::ios_base::failure& e) {        
     }
 #endif
-
-    
 }
+
 
 
 #endif

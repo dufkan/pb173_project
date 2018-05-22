@@ -272,15 +272,13 @@ void Server::connection_handler() {
 #endif
 
             Channel chan{std::move(sock)};
-        //std::vector<uint8_t> recv_byte = chan.recv();
 
             auto uniq_init = message_deserializer(chan.recv());
             msg::ClientInit& init = dynamic_cast<msg::ClientInit&>(*uniq_init.get());
             init.decrypt(server_key);
 
             if(!init.check_mac()) {
-                /* Trouble with integrity MAC*/
-                std::cerr << "Trouble with integrity - MAC client init msg on server." << std::endl;
+                throw std::runtime_error{"Trouble with integrity - MAC is not right."};
                 return;
             }
 
@@ -313,8 +311,8 @@ void Server::connection_handler() {
             auto [verify_Rs, IK, SPK] = cresp.get();
             auto [sign, signing_key] = cresp.get_sign_and_key();
             if(verify_Rs != Rs) {
-                std::cerr << "We got a BIG problem! 'Rs != Rs'" << std::endl;
-                continue; // TODO exception
+                throw std::runtime_error{"Client response is not OK."};
+                continue; 
             }
 
             chan.set_crybox(std::unique_ptr<CryBox>{new SeqBox{new AESBox{K}, new MACBox{K}}});
