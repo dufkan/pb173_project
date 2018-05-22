@@ -301,7 +301,7 @@ TEST_CASE("DRBox2","encrypt and decrypt"){
         CHECK(a.CKs == b.CKr);
 
         std::vector skipped1 = a.encrypt(data);
-        std::array<uint8_t,32> key = cry::hash_sha(a.CKs);
+        std::array<uint8_t,32> key = cry::kdf(a.CKs, std::array<uint8_t, 32>{});
         std::array<uint8_t,32> pubkey = a.DHs.get_bin_q();
         CHECK(pubkey == b.pubkey); 
         CHECK(a.CKs != b.CKr);

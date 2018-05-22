@@ -170,11 +170,8 @@ public:
      * @return Two keys, new RK and CK
      */
     static std::pair<key32, key32> kdf_RK(const key32& k, const key32& input) {
-        std::vector<uint8_t> concat;
-        concat.insert(concat.end(), k.begin(), k.end());
-        concat.insert(concat.end(), input.begin(), input.end());
-        auto newkey = cry::hash_sha(concat);
-        return {newkey, cry::hash_sha(newkey)};
+        auto newkey = cry::kdf(k, input);
+        return {newkey, cry::kdf(newkey, std::array<uint8_t, 32>{})};
     }
 
 
@@ -185,8 +182,8 @@ public:
      * @return Two keys, new CK and key for encrypting/decrypting
      */
     static std::pair<key32, key32> kdf_CK(const key32& k) {
-        auto newkey = cry::hash_sha(k);
-        return {newkey, cry::hash_sha(newkey)};
+        auto newkey = cry::kdf(k, std::array<uint8_t, 32>{});
+        return {newkey, cry::kdf(newkey, std::array<uint8_t, 32>{})};
     }
 
     /**
