@@ -54,15 +54,12 @@ TEST_CASE("Get active user vector") {
 
 TEST_CASE("Handle Send") {
     msg::MessageDeserializer md;
-    SECTION("with connected user") {
-        // TODO requires implementation of dummy channel, not sure if worth it though
-    }
     SECTION("without connected user") {
         Server s;
         s.handle_send("bob", msg::Send{"alice", std::vector<uint8_t>{0x60, 0x61, 0x62, 0x63}});
 
         std::vector<uint8_t> smsg = s.message_queue["alice"].front();
-        s.message_queue["alice"].pop();
+        s.message_queue["alice"].pop_front();
 
         auto dmsg = md(smsg);
         auto& msg = dynamic_cast<msg::Recv&>(*dmsg.get());
@@ -78,21 +75,21 @@ TEST_CASE("Handle Send") {
         s.handle_send("bob", msg::Send{"alice", std::vector<uint8_t>{0x61, 0x61, 0x62, 0x63}});
 
         std::vector<uint8_t> smsg = s.message_queue["alice"].front();
-        s.message_queue["alice"].pop();
+        s.message_queue["alice"].pop_front();
         auto dmsg = md(smsg);
         auto& m1 = dynamic_cast<msg::Recv&>(*dmsg.get());
         REQUIRE(m1.get_sender() == "bob");
         REQUIRE(m1.get_text() == std::vector<uint8_t>{0x60, 0x61, 0x62, 0x63});
 
         smsg = s.message_queue["alice"].front();
-        s.message_queue["alice"].pop();
+        s.message_queue["alice"].pop_front();
         dmsg = md(smsg);
         auto& m2 = dynamic_cast<msg::Recv&>(*dmsg.get());
         REQUIRE(m2.get_sender() == "eve");
         REQUIRE(m2.get_text() == std::vector<uint8_t>{0x66, 0x60});
 
         smsg = s.message_queue["alice"].front();
-        s.message_queue["alice"].pop();
+        s.message_queue["alice"].pop_front();
         dmsg = md(smsg);
         auto& m3 = dynamic_cast<msg::Recv&>(*dmsg.get());
         REQUIRE(m3.get_sender() == "bob");
@@ -122,7 +119,7 @@ TEST_CASE("Store/load prekey") {
         Server::store_prekeys("u" + std::to_string(i), IK, SPK, OPKs, sign, rsak);
     }
 
-    for(int i = 0; i < 10; ++i) {
+    for(uint16_t i = 0; i < 10; ++i) {
         std::array<uint8_t, 32> IK;
         std::iota(IK.begin(), IK.end(), i);
         std::array<uint8_t, 32> SPK;
@@ -131,7 +128,7 @@ TEST_CASE("Store/load prekey") {
         std::array<uint8_t, 512> sign;
         std::iota(sign.begin(),sign.end(), i * 10);
         std::vector<uint8_t> rsak(sign.begin(),sign.end());
-        
+
         auto [stored_IK, stored_SPK, stored_OPKs, stored_sign, stored_rsak] = Server::load_prekeys("u" + std::to_string(i));
         REQUIRE(IK == stored_IK);
         REQUIRE(SPK == stored_SPK);
@@ -139,7 +136,7 @@ TEST_CASE("Store/load prekey") {
         REQUIRE(rsak == stored_rsak);
         REQUIRE(stored_OPKs.size() == i);
 
-        for(int j = 0; j < i; ++j) {
+        for(uint16_t j = 0; j < i; ++j) {
             uint16_t id = j * 1024;
             std::array<uint8_t, 32> OPK;
             std::iota(OPK.begin(), OPK.end(), j);

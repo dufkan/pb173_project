@@ -10,7 +10,7 @@
 #include <map>
 #include <cstdio>
 #include <utility>
-#include <queue>
+#include <deque>
 #include <thread>
 #include <chrono>
 #include <mutex>
@@ -38,7 +38,7 @@ public:
     std::map<std::string, std::tuple<key32, key32, std::vector<std::pair<uint16_t, key32>>, std::array<uint8_t,512>, std::vector<uint8_t>>> prekeys; // IK, SPK, OPK, signature, RSAsig
     std::mutex connection_queue_mutex;
     std::deque<std::pair<std::string, Channel>> connection_queue;
-    std::map<std::string, std::queue<std::vector<uint8_t>>> message_queue;
+    std::map<std::string, std::deque<std::vector<uint8_t>>> message_queue;
     cry::RSAKey server_key;
     msg::MessageDeserializer message_deserializer;
     asio::io_service io_service;
@@ -81,8 +81,10 @@ public:
 
     /**
      * Thread-safe synchronization of incoming connections with connected users
+     *
+     * @return vector of newly connected users
      */
-    void sync_connections();
+    std::vector<std::string> sync_connections();
 
     /**
      * Thread-safe deletion of connections
@@ -231,14 +233,21 @@ bool Server::remove_client_key(const std::string& pseudonym) {
     return std::remove(path.c_str()) == 0;
 }
 
-void Server::sync_connections() {
+std::vector<std::string> Server::sync_connections() {
     std::unique_lock lock{connection_queue_mutex, std::try_to_lock};
     if(!lock.owns_lock())
-        return;
+        return {};
+    std::vector<std::string> conlist;
+    for(auto& c : connection_queue)
+        conlist.push_back(c.first);
+
     connections.insert(std::move_iterator(connection_queue.begin()), std::move_iterator(connection_queue.end()));
+
     while(!connection_queue.empty()) {
         connection_queue.pop_front();
     }
+
+    return conlist;
 }
 
 Server::Server() {
@@ -344,7 +353,15 @@ void Server::run() {
     auto t = std::thread(&Server::connection_handler, this);
     for(;;) {
         std::vector<std::string> dc_list;
-        sync_connections();
+        auto newlings = sync_connections();
+        for(auto n : newlings) {
+            auto nmsgq = message_queue.find(n);
+            if(nmsgq != message_queue.end()) {
+                for(auto m : nmsgq->second)
+                    send_to(n, m);
+                nmsgq->second.clear();
+            }
+        }
         for(auto& c : connections) {
             auto msg = c.second.try_recv();
             if(!msg.empty()) {
@@ -388,14 +405,14 @@ void Server::release_connections(const std::vector<std::string>& dcs) {
 void Server::send_to(const std::string& pseudonym, const std::vector<uint8_t>& msg) {
     auto conn = connections.find(pseudonym);
     if(conn == connections.end() || !conn->second.is_alive()) {
-        message_queue[pseudonym].push(msg);
+        message_queue[pseudonym].push_back(msg);
     }
     else {
         try {
             conn->second.send(msg);
         }
         catch(ChannelException& e) {
-            message_queue[pseudonym].push(msg);
+            message_queue[pseudonym].push_back(msg);
         }
     }
 }
