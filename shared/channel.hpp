@@ -11,7 +11,7 @@
 
 class ChannelException : public std::runtime_error {
 public:
-    ChannelException(std::string err): std::runtime_error(std::move(err)) {}
+    explicit ChannelException(const std::string& err): std::runtime_error(err) {}
 };
 
 class Channel {
@@ -52,7 +52,7 @@ public:
     }
 
 public:
-    Channel(asio::ip::tcp::socket&& sock): sock(std::move(sock)), crybox(std::make_unique<IdBox>()), last(std::chrono::steady_clock::now()) {}
+    explicit Channel(asio::ip::tcp::socket&& sock): sock(std::move(sock)), crybox(std::make_unique<IdBox>()), last(std::chrono::steady_clock::now()) {}
 
     template<typename M, typename = typename std::enable_if<std::is_base_of<msg::Message, M>::value>>
     void send(const M& msg) {

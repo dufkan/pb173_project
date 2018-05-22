@@ -148,7 +148,6 @@ TEST_CASE("X3DH message, prekeys exchange, initial message and share secret key"
 
 
 TEST_CASE("save and load client params") {
-    std::string pseudonym = "noone";
     std::vector<uint8_t> bin_ik;
     std::vector<uint8_t> bin_spk;
     std::array<uint8_t, 32> bin_qp;

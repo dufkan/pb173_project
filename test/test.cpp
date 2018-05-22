@@ -15,10 +15,10 @@ int main(int argc, char** argv) {
 }
 
 #include "test_crypto.cpp"
-#include "test_server.cpp"
-#include "test_messages.cpp"
-//    #include "test_channel.cpp"
-#include "test_client.cpp"
+//#include "test_server.cpp"
+//#include "test_messages.cpp"
+//#include "test_channel.cpp"
+//#include "test_client.cpp"
 #include "test_crybox.cpp"
 //    #include "test_communication.cpp"
 

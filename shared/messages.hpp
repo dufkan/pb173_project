@@ -73,12 +73,12 @@ public:
 
     std::array<uint8_t,32> mac;
 
-    ClientInit(std::vector<uint8_t> eRc, std::vector<uint8_t> epayload, std::array<uint8_t,32> mac = {}):
-        eRc(std::move(eRc)), epayload(std::move(epayload)), mac(mac) {}
+    ClientInit(const std::vector<uint8_t>& eRc, const std::vector<uint8_t>& epayload, std::array<uint8_t,32> mac = {}):
+        eRc(eRc), epayload(epayload), mac(std::move(mac)) {}
 
 public:
-    ClientInit(std::string pseudonym, std::array<uint8_t, 32> Rc, std::vector<uint8_t> key, std::array<uint8_t,32> mac = {}):
-        pseudonym(std::move(pseudonym)), Rc(std::move(Rc)), key(std::move(key)), mac(mac) {}
+    ClientInit(const std::string& pseudonym, std::array<uint8_t, 32> Rc, const std::vector<uint8_t>& key, std::array<uint8_t,32> mac = {}):
+        pseudonym(pseudonym), Rc(std::move(Rc)), key(key), mac(std::move(mac)) {}
 
     void encrypt(cry::RSAKey& server_pub) {
         eRc = cry::encrypt_rsa(Rc, server_pub);
@@ -158,8 +158,8 @@ public:
     std::array<uint8_t,32> mac;
 
 
-    ServerResp(std::vector<uint8_t> eRs, std::vector<uint8_t> eRc, std::array<uint8_t,32> mac = {}):
-        eRs(std::move(eRs)), eRc(std::move(eRc)), mac(mac) {}
+    ServerResp(const std::vector<uint8_t>& eRs, const std::vector<uint8_t>& eRc, std::array<uint8_t,32> mac = {}):
+        eRs(eRs), eRc(eRc), mac(std::move(mac)) {}
 
 public:
     ServerResp(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> Rc, std::array<uint8_t,32> mac={}):
@@ -234,11 +234,10 @@ public:
     std::vector<uint8_t> epayload;
 
 
-    ClientResp(std::vector<uint8_t> epayload): epayload(std::move(epayload)) {}
+    explicit ClientResp(const std::vector<uint8_t>& epayload): epayload(epayload) {}
 public:
-    ClientResp(std::array<uint8_t, 32> Rs): Rs(std::move(Rs)) {}
-    ClientResp(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> IK, std::array<uint8_t, 32> SPK, std::array<uint8_t,512> sign, std::vector<uint8_t> rsak): Rs(std::move(Rs)), IK(std::move(IK)), SPK(std::move(SPK)), sign(std::move(sign)), rsak(std::move(rsak)){
-    }
+    explicit ClientResp(std::array<uint8_t, 32> Rs): Rs(std::move(Rs)) {}
+    ClientResp(std::array<uint8_t, 32> Rs, std::array<uint8_t, 32> IK, std::array<uint8_t, 32> SPK, std::array<uint8_t,512> sign, const std::vector<uint8_t>& rsak): Rs(std::move(Rs)), IK(std::move(IK)), SPK(std::move(SPK)), sign(std::move(sign)), rsak(rsak) {}
 
     void encrypt(const std::array<uint8_t, 32>& K) {
         Encoder e;
@@ -324,7 +323,7 @@ public:
      * @param skey Symetric key shared with the server
      * @param text Text of message sending to reciever
      */
-    Send(std::string receiver, std::vector<uint8_t> text): receiver(receiver), text(text) {}
+    Send(const std::string& receiver, const std::vector<uint8_t>& text): receiver(receiver), text(text) {}
 
 
     /**
@@ -397,7 +396,7 @@ public:
      * @param sender Pseudonym of the sender of the message
      * @param text Text of message
      */
-    Recv(std::string sender, std::vector<uint8_t> text): sender(sender), text(text) {}
+    Recv(const std::string& sender, const std::vector<uint8_t>& text): sender(sender), text(text) {}
 
     /**
      * Deserialize Recieve message from its binary representation
@@ -492,7 +491,7 @@ public:
     std::array<uint8_t, 512> sign; /*RSA signature of SPKey*/
     std::vector<uint8_t>     signing_key;
 public:
-    RetPrekey(std::string pseudonym, uint16_t id, std::array<uint8_t, 32> OPKey, std::array<uint8_t, 32> IKey, std::array<uint8_t, 32> SPKey, std::array<uint8_t,512> sign, std::vector<uint8_t> signing_key): pseudonym(std::move(pseudonym)), id(id), OPKey(std::move(OPKey)), IKey(std::move(IKey)), SPKey(std::move(SPKey)), sign(std::move(sign)), signing_key(std::move(signing_key)) {}
+    RetPrekey(const std::string& pseudonym, uint16_t id, std::array<uint8_t, 32> OPKey, std::array<uint8_t, 32> IKey, std::array<uint8_t, 32> SPKey, std::array<uint8_t,512> sign, const std::vector<uint8_t>& signing_key): pseudonym(pseudonym), id(id), OPKey(std::move(OPKey)), IKey(std::move(IKey)), SPKey(std::move(SPKey)), sign(std::move(sign)), signing_key(signing_key) {}
 
     std::vector<uint8_t> serialize() const {
         Encoder message;
@@ -572,7 +571,7 @@ public:
 #endif
     std::string pseudonym;
 public:
-    AskPrekey(std::string pseudonym): pseudonym(std::move(pseudonym)) {}
+    explicit AskPrekey(const std::string& pseudonym): pseudonym(pseudonym) {}
 
     std::vector<uint8_t> serialize() const {
         Encoder message;
@@ -691,7 +690,7 @@ public:
 #endif
     std::set<std::string> on_users;
 public:
-    RetOnline(std::set<std::string> on_users) : on_users(on_users) {}
+    explicit RetOnline(const std::set<std::string>& on_users) : on_users(on_users) {}
 
     std::vector<uint8_t> serialize() {
         Encoder message;
@@ -791,7 +790,7 @@ public:
     std::vector<uint8_t> text;
 
 public:
-    X3dhInit(std::string pseudonym, std::array<uint8_t, 32> IK, std::array<uint8_t, 32> EK, uint16_t id, std::vector<uint8_t> text) : pseudonym(pseudonym), IK(std::move(IK)), EK(std::move(EK)), id(id), text(std::move(text)) {}
+    X3dhInit(const std::string& pseudonym, std::array<uint8_t, 32> IK, std::array<uint8_t, 32> EK, uint16_t id, const std::vector<uint8_t>& text) : pseudonym(pseudonym), IK(std::move(IK)), EK(std::move(EK)), id(id), text(text) {}
 
     std::vector<uint8_t> serialize() {
         Encoder msg;
@@ -841,7 +840,7 @@ public:
         return text;
     }
 
-    void change_name(std::string new_name){
+    void change_name(const std::string& new_name) {
         pseudonym = new_name;
     }
 

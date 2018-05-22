@@ -10,7 +10,7 @@
 #include <map>
 #include <cstdio>
 #include <utility>
-#include <queue>
+#include <deque>
 #include <thread>
 #include <chrono>
 #include <mutex>
@@ -38,7 +38,7 @@ public:
     std::map<std::string, std::tuple<key32, key32, std::vector<std::pair<uint16_t, key32>>, std::array<uint8_t,512>, std::vector<uint8_t>>> prekeys; // IK, SPK, OPK, signature, RSAsig
     std::mutex connection_queue_mutex;
     std::deque<std::pair<std::string, Channel>> connection_queue;
-    std::map<std::string, std::queue<std::vector<uint8_t>>> message_queue;
+    std::map<std::string, std::deque<std::vector<uint8_t>>> message_queue;
     cry::RSAKey server_key;
     msg::MessageDeserializer message_deserializer;
     asio::io_service io_service;
@@ -81,8 +81,10 @@ public:
 
     /**
      * Thread-safe synchronization of incoming connections with connected users
+     *
+     * @return vector of newly connected users
      */
-    void sync_connections();
+    std::vector<std::string> sync_connections();
 
     /**
      * Thread-safe deletion of connections
@@ -107,7 +109,7 @@ public:
      * @param SPK - Signed Prekey
      * @param OPKs - Vector of one-time prekeys with assigned ids
      */
-    static void store_prekeys(const std::string pseudonym, key32 IK, key32 SPK, std::vector<std::pair<uint16_t, key32>> OPKs, std::array<uint8_t, 512> sign, std::vector<uint8_t> signing_key);
+    static void store_prekeys(const std::string& pseudonym, key32 IK, key32 SPK, std::vector<std::pair<uint16_t, key32>> OPKs, std::array<uint8_t, 512> sign, std::vector<uint8_t> signing_key);
 
     /**
      * Load prekeys of certain client from local file
@@ -115,7 +117,7 @@ public:
      * @param pseudonym - Name of the Client
      * @returns The ALL-IN-ONE bundle!
      */
-    static std::tuple<key32, key32, std::vector<std::pair<uint16_t, key32>>, std::array<uint8_t,512>, std::vector<uint8_t>> load_prekeys(const std::string pseudonym);
+    static std::tuple<key32, key32, std::vector<std::pair<uint16_t, key32>>, std::array<uint8_t,512>, std::vector<uint8_t>> load_prekeys(const std::string& pseudonym);
 public:
     Server();
 
@@ -156,7 +158,7 @@ public:
      * @param pseudonym - Originator of the message
      * @param msg - The message
      */
-    void handle_send(const std::string& pseudonym, msg::Send msg);
+    void handle_send(const std::string& pseudonym, const msg::Send& msg);
 
     /**
      * GetOnline Message handler
@@ -172,7 +174,7 @@ public:
      * @param pseudonym - Originator of the message
      * @param msg - The message
      */
-    void handle_ask_prekey(const std::string& pseudonym, msg::AskPrekey msg);
+    void handle_ask_prekey(const std::string& pseudonym, const msg::AskPrekey& msg);
 
     /**
      * UploadPrekey Message handler
@@ -180,7 +182,7 @@ public:
      * @param pseudonym - Originator of the message
      * @param msg - The message
      */
-    void handle_upload_prekey(const std::string& pseudonym, msg::UploadPrekey msg);
+    void handle_upload_prekey(const std::string& pseudonym, const msg::UploadPrekey& msg);
 
     /**
      * Message error handler
@@ -231,14 +233,21 @@ bool Server::remove_client_key(const std::string& pseudonym) {
     return std::remove(path.c_str()) == 0;
 }
 
-void Server::sync_connections() {
+std::vector<std::string> Server::sync_connections() {
     std::unique_lock lock{connection_queue_mutex, std::try_to_lock};
     if(!lock.owns_lock())
-        return;
+        return {};
+    std::vector<std::string> conlist;
+    for(auto& c : connection_queue)
+        conlist.push_back(c.first);
+
     connections.insert(std::move_iterator(connection_queue.begin()), std::move_iterator(connection_queue.end()));
+
     while(!connection_queue.empty()) {
         connection_queue.pop_front();
     }
+
+    return conlist;
 }
 
 Server::Server() {
@@ -342,7 +351,15 @@ void Server::run() {
     auto t = std::thread(&Server::connection_handler, this);
     for(;;) {
         std::vector<std::string> dc_list;
-        sync_connections();
+        auto newlings = sync_connections();
+        for(auto n : newlings) {
+            auto nmsgq = message_queue.find(n);
+            if(nmsgq != message_queue.end()) {
+                for(auto m : nmsgq->second)
+                    send_to(n, m);
+                nmsgq->second.clear();
+            }
+        }
         for(auto& c : connections) {
             auto msg = c.second.try_recv();
             if(!msg.empty()) {
@@ -386,14 +403,14 @@ void Server::release_connections(const std::vector<std::string>& dcs) {
 void Server::send_to(const std::string& pseudonym, const std::vector<uint8_t>& msg) {
     auto conn = connections.find(pseudonym);
     if(conn == connections.end() || !conn->second.is_alive()) {
-        message_queue[pseudonym].push(msg);
+        message_queue[pseudonym].push_back(msg);
     }
     else {
         try {
             conn->second.send(msg);
         }
         catch(ChannelException& e) {
-            message_queue[pseudonym].push(msg);
+            message_queue[pseudonym].push_back(msg);
         }
     }
 }
@@ -406,7 +423,7 @@ std::set<std::string> Server::get_connected_users() {
     return connected;
 }
 
-void Server::handle_send(const std::string& pseudonym, msg::Send msg) {
+void Server::handle_send(const std::string& pseudonym, const msg::Send& msg) {
     msg::Recv recv{pseudonym, msg.get_text()}; 
     send_to(msg.get_receiver(), recv.serialize());
 }
@@ -457,10 +474,9 @@ void Server::handle_x3dh_init(const std::string& pseudonym, msg::X3dhInit msg) {
     send_to(recv, msg.serialize());
 }
 
-void Server::handle_ask_prekey(const std::string& pseudonym, msg::AskPrekey msg) {
+void Server::handle_ask_prekey(const std::string& pseudonym, const msg::AskPrekey& msg) {
     auto pks = prekeys.find(msg.get_pseudonym());
     if(pks == prekeys.end());
-    // TODO respond with error if fails
     else {
         auto& [IK, SPK, OPKs, sign, rsak] = pks->second;
         uint16_t id = 0;
@@ -474,11 +490,11 @@ void Server::handle_ask_prekey(const std::string& pseudonym, msg::AskPrekey msg)
     }
 }
 
-void Server::handle_upload_prekey(const std::string& pseudonym, msg::UploadPrekey msg) {
+void Server::handle_upload_prekey(const std::string& pseudonym, const msg::UploadPrekey& msg) {
     std::get<2>(prekeys[pseudonym]).push_back(msg.get());
 }
 
-void Server::store_prekeys(const std::string pseudonym, key32 IK, key32 SPK, std::vector<std::pair<uint16_t, key32>> OPKs, std::array<uint8_t, 512> sign, std::vector<uint8_t> signing_key) {
+void Server::store_prekeys(const std::string& pseudonym, key32 IK, key32 SPK, std::vector<std::pair<uint16_t, key32>> OPKs, std::array<uint8_t, 512> sign, std::vector<uint8_t> signing_key) {
     Encoder e;
     e.put(IK);
     e.put(SPK);
@@ -493,7 +509,7 @@ void Server::store_prekeys(const std::string pseudonym, key32 IK, key32 SPK, std
     util::write_file("prekeys/" + pseudonym, e.move());
 }
 
-std::tuple<key32, key32, std::vector<std::pair<uint16_t, key32>>, std::array<uint8_t,512>, std::vector<uint8_t>> Server::load_prekeys(const std::string pseudonym) {
+std::tuple<key32, key32, std::vector<std::pair<uint16_t, key32>>, std::array<uint8_t,512>, std::vector<uint8_t>> Server::load_prekeys(const std::string& pseudonym) {
     Decoder d{util::read_file("prekeys/" + pseudonym)};
     auto IK = d.get_arr<32>();
     auto SPK = d.get_arr<32>();
