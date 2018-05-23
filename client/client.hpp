@@ -588,7 +588,7 @@ void Client::run() {
                     std::tie(p, t) = ui_get_param_msg();
                     chan->send(send_msg_byte(p, t));
                 }
-                catch(std::ios_base::failure& e) {
+                catch(std::logic_error& e) {
                     std::cerr << "Trying to send a message to someone you don't know.\nSave him in contacts first." << std::endl;
                 }
                 break;
